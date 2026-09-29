@@ -10,7 +10,7 @@ Swagger is already generated: open `http://127.0.0.1:8000/docs` after the app is
 
 ## 1. What to say in 30 seconds
 
-> I built the user module of an online shopping API with FastAPI and PostgreSQL. A user can register and log in, browse and search products, manage a cart, and place an order. The code is split into routers, services, repositories, and SQLAlchemy models. Input is checked with Pydantic. Business mistakes (empty cart, not enough stock, duplicate email) are custom exceptions that become JSON. Passwords are stored as a salted hash, not plain text. There is no JWT. Login looks up the email in the Users table and compares the password with the stored hash.
+> I built the user module of an online shopping API with FastAPI and PostgreSQL. A user can register and log in, browse and search products, manage a cart, and place an order. The code is split into routers, services, repositories, and SQLAlchemy models. Input is checked with Pydantic. Business mistakes (empty cart, not enough stock, duplicate email) are custom exceptions that become JSON. Passwords are stored as a salted hash, not plain text. Login checks the Users table and returns a JWT. Cart and order routes require that bearer token, and the user id in the request must match the token.
 
 ---
 
@@ -33,7 +33,7 @@ Example: `POST /api/cart/add`
 2. `Depends(get_db)` opens one database session for this request.
 3. `CartAddRequest` checks that `user_id`, `product_id`, and `quantity` are positive integers. If `quantity` is 0, FastAPI stops here with **422**. The service never runs.
 4. `cart_service.add_item` checks that the user exists, the product exists, and the quantity is not above stock.
-5. `cart_repository` inserts or updates a `CartItems` row and commits.
+5. `cart_repository` finds the user's open cart, or creates cart id 1, then inserts or updates a line in that cart and commits.
 6. The service builds a response. The router returns **201**.
 
 If the service raises `NotFoundException`, `main.py` turns it into `{"detail": "..."}` with status **404**. The router does not contain that if/else.
@@ -145,15 +145,17 @@ For each request FastAPI calls `get_db`, gives that session to the function, and
 You do not write `SELECT * FROM Products` in the routers. A `Product` object is a row. `product.category.category_name` works because the model says a product belongs to one category.
 
 ```
-Users 1 --- many CartItems
+Users 1 --- many Carts
+Carts 1 --- many CartItems
 Users 1 --- many Orders
 Categories 1 --- many Products
 Products 1 --- many CartItems
 Products 1 --- many OrderDetails
 Orders 1 --- many OrderDetails
+Carts 1 --- zero or one Order
 ```
 
-A cart has a unique pair of `UserID` + `ProductID`. The same user cannot have two rows for the same product. Adding it again increases `Quantity`.
+A user can have many carts over time. Only one of them is `OPEN`. `CartID` starts at 1 for every user: the first basket is 1, the basket after the first checkout is 2. Lines inside a cart are unique on `ProductID`. Adding the same product again increases `Quantity`. There is no `CartItemID`.
 
 ### Commit, flush, rollback
 
@@ -161,7 +163,7 @@ A cart has a unique pair of `UserID` + `ProductID`. The same user cannot have tw
 - **commit** makes the change permanent.
 - **rollback** throws the change away.
 
-Checkout inserts the order, inserts every line, reduces stock, and deletes the cart, then commits **once**. If anything fails before that commit, none of those changes stay. That is one transaction.
+Checkout inserts the order, inserts every line, reduces stock, and marks the open cart as `ORDERED`, then commits **once**. The lines stay on that cart as the basket that was bought. If anything fails before that commit, none of those changes stay. That is one transaction.
 
 ### Why the order stores its own price
 
@@ -173,7 +175,9 @@ The `Password` column stores `salt$hash`, not `secret123`. `hash_password` makes
 
 Login does not say "email not found" versus "wrong password". Both return **401** `Invalid email or password`. That stops someone from discovering which emails are registered.
 
-There is no JWT and no `Authorization` header. After login, cart and order calls send `user_id` in the path or body, which matches the case study.
+Login checks the Users table, then `create_access_token` puts the user id in the JWT `sub` claim. The password is not inside the token. `POST /api/users/login` and `POST /api/auth/login` both return `access_token` and `token_type` `bearer`.
+
+Cart and order routes use `get_current_user`. A missing or bad token is **401**. A valid token for a different `user_id` than the path or body is **403**. Product browse does not need a token.
 
 ### CORS
 
@@ -203,8 +207,9 @@ If you run `uvicorn` on your machine, `DATABASE_URL` must use `localhost` and po
 | Users | UserID, Name, Email, Password, Mobile | Email is unique |
 | Categories | CategoryID, CategoryName | CategoryName is unique |
 | Products | ProductID, ProductName, Description, CategoryID, Price, AvailableQuantity, ProductUrl | ProductName is unique. CategoryID is a foreign key |
-| CartItems | CartItemID, UserID, ProductID, Quantity | one row per user + product. Quantity must be > 0 |
-| Orders | OrderID, UserID, OrderDate, PaymentMethod, TotalAmount | TotalAmount is calculated by the server |
+| Carts | UserID + CartID, Status, CreatedAt | one open basket per user. CartID starts at 1 for each user |
+| CartItems | UserID + CartID + ProductID, Quantity | one line per product inside a cart. Quantity must be > 0 |
+| Orders | OrderID, UserID, CartID, OrderDate, PaymentMethod, TotalAmount | CartID is the basket that was checked out. TotalAmount is calculated by the server |
 | OrderDetails | OrderDetailID, OrderID, ProductID, Quantity, Price | Price is the unit price at checkout |
 
 Payment methods stored on the order: `COD`, `CARD`, `UPI`, `NET_BANKING`. The API uppercases the value, so `"upi"` becomes `UPI`.
@@ -248,7 +253,9 @@ Same email at the same time can also hit the database unique constraint. That `I
 }
 ```
 
-Service loads the user by email and calls `verify_password`. Success returns the user. Failure is **401**, whether the email is unknown or the password is wrong.
+Service loads the user by email and calls `verify_password`. Success returns the user plus `access_token`. Failure is **401**, whether the email is unknown or the password is wrong. `POST /api/auth/login` does the same check and returns the same body.
+
+In Swagger, click **Authorize**, paste only the token (no `Bearer` word), then call cart or order routes.
 
 ### 6.3 Browse
 
@@ -280,17 +287,19 @@ Rules, in order:
 1. Quantity must be > 0, or **422** (schema).
 2. User must exist, or **404** `User not found`.
 3. Product must exist, or **404** `Product must exist before adding to cart`.
-4. If this user already has that product, new quantity = old quantity + requested quantity.
+4. If the open cart already has that product, new quantity = old quantity + requested quantity.
 5. That total must be `<= AvailableQuantity`, or **400** `Quantity cannot exceed available stock`.
-6. Insert or update, then return the line with `unit_price` and `line_total`.
+6. Insert or update the line inside the open cart, then return the line with `cart_id`, `unit_price`, and `line_total`.
 
-`GET /api/cart/{user_id}` returns the lines. An existing user with an empty cart returns `"items": []`, not 404.
+The first add for a user creates cart `1` with status `OPEN`. A later add, before checkout, stays in that same cart. After checkout, the next add creates cart `2`. Another user also starts at cart `1`.
+
+`GET /api/cart/{user_id}` returns the open basket. If the user has never added anything, or the last cart was already ordered, `cart_id` is `null` and `items` is `[]`. That is not a 404. An open cart whose lines were all removed still has its `cart_id` and status `OPEN`, with `items` empty.
 
 `GET /api/cart/{user_id}/summary` adds `distinct_items`, `total_quantity`, and `total_amount`.
 
-`PUT /api/cart/update/{cart_item_id}` sets quantity to the number in the body. It does not add. Missing row is **404** `Cart item must exist before update`.
+`PUT /api/cart/update/{user_id}/{product_id}` sets quantity to the number in the body. It does not add. A product that is not in the open cart is **404** `Cart item must exist before update`.
 
-`DELETE /api/cart/remove/{cart_item_id}` returns `{"message": "Item removed from cart"}`. Missing row is **404**.
+`DELETE /api/cart/remove/{user_id}/{product_id}` returns `{"message": "Item removed from cart"}`. Missing product is **404**.
 
 The summary route is `/cart/{user_id}/summary`. It is registered before `/cart/{user_id}` so `summary` is not parsed as a user id.
 
@@ -312,14 +321,14 @@ The client does **not** send the total. The server calculates it.
 3. Cart must have at least one line, or **400** `User must have at least one cart item before checkout`.
 4. Each line quantity must still be `<=` current stock, or **400** `Ordered quantity must not exceed available quantity`. Stock is checked again because another order may have reduced it after the item was added.
 5. `TotalAmount` = sum of (current price × quantity), rounded to 2 decimals.
-6. Insert `Orders`, insert `OrderDetails` with the copied unit price, subtract stock, delete cart rows, commit once.
-7. Response includes the order and its lines.
+6. Insert `Orders` with that `cart_id`, insert `OrderDetails` with the copied unit price, subtract stock, set the cart status to `ORDERED`, commit once.
+7. Response includes the order, its `cart_id`, and its lines.
 
-`GET /api/orders/{user_id}` is history: id, date, payment method, total. No line items.
+`GET /api/orders/{user_id}` is history: id, cart id, date, payment method, total. No line items.
 
 `GET /api/orders/details/{order_id}` is the full order including lines. Unknown id is **404** `Order not found`.
 
-After a successful checkout the cart is empty, so a second checkout returns **400**.
+After a successful checkout there is no open cart, so a second checkout returns **400**. The ordered cart is kept, with status `ORDERED`. It is not what `GET /api/cart/{user_id}` returns.
 
 Worked example: LED Desk Lamp is 24.75. Quantity 3. Summary and order total are **74.25**. Payment method stored as `CARD` if the body said `"card"`.
 
@@ -431,11 +440,15 @@ PostgreSQL check constraints say `"Quantity" > 0` with quotes. Unquoted `Quantit
 
 **What is a foreign key?** `Products.CategoryID` must point at a real `Categories.CategoryID`. The database rejects a product whose category does not exist.
 
-**What is a primary key?** The id that identifies one row. `UserID`, `ProductID`, and so on. They are auto-incremented.
+**What is a primary key?** The id that identifies one row. `UserID`, `ProductID`, and `OrderID` are generated by the database. `CartID` is different: it is numbered per user, starting at 1, and together with `UserID` it identifies one basket.
+
+**Why does cart id start at 1 for every user?** A cart is that shopper's basket, not a global ticket number. User 4 and user 9 both get cart 1 for their first basket. Checkout closes cart 1. The next basket for that same user is cart 2. Lines are found by product inside the open cart, so there is no `CartItemID`.
 
 **Difference between 400 and 422?** 422 means the JSON itself is invalid. 400 means the JSON is valid but the business rule failed (stock, empty cart).
 
 **Difference between 401 and 404 on login?** We use 401 for both unknown email and wrong password so we do not reveal which emails exist.
+
+**Difference between 401 and 403 on cart?** 401 means the token is missing, expired, or fake. 403 means the token is valid, but the `user_id` in the path or body is a different person.
 
 **Why 409 for duplicate email?** 409 means the request conflicts with current data. 400 would also be understood, but 409 is the usual choice for a unique-key clash.
 
@@ -453,7 +466,7 @@ PostgreSQL check constraints say `"Quantity" > 0` with quotes. Unquoted `Quantit
 
 **How do you run it?** `docker compose up --build`. API on port 8000, Postgres on localhost port 5433.
 
-**What would you add next?** A real auth token so cart routes do not trust a raw `user_id`, product admin APIs, and pagination on the product list. Say this only if they ask what is missing. Do not apologize for the case study scope.
+**What would you add next?** Role checks so an admin can manage products, and pagination on the product list. Say this only if they ask what is missing. Do not apologize for the case study scope.
 
 ---
 
@@ -461,11 +474,11 @@ PostgreSQL check constraints say `"Quantity" > 0` with quotes. Unquoted `Quantit
 
 1. App starts, tables are created, 4 categories and 10 products are inserted.
 2. Rudra registers with email `rudra.shop@example.com`, password `secret123`, mobile `9988776655`. The stored password is a salt plus hash.
-3. He logs in. The API finds that email and the hash matches. Response is his user id, name, email, and mobile.
+3. He logs in. The API finds that email and the hash matches. The response includes his user and an `access_token`. Later cart and order calls send `Authorization: Bearer` plus that token.
 4. He searches `name=lamp` and gets the LED Desk Lamp.
 5. He adds quantity 2. The line total is 24.75 × 2.
 6. He updates the line to quantity 3. Summary total is 74.25. Stock is still unchanged.
-7. He checks out with `CARD`. An order row and one detail row are written. The detail price is 24.75, not whatever the lamp costs later. Stock drops by 3. The cart row is deleted.
-8. Order history shows that order. Order details show the lamp line. A second checkout fails because the cart is empty.
+7. He checks out with `CARD`. An order row and one detail row are written. The order stores `cart_id` 1. The detail price is 24.75, not whatever the lamp costs later. Stock drops by 3. Cart 1 is marked `ORDERED`.
+8. Order history shows that order. Order details show the lamp line. A second checkout fails because there is no open cart. The next add opens cart 2.
 
 If any step used a bad body, he would see 422 before those rules run. If the lamp id did not exist, he would see 404 from the cart service. If he asked for 999 units, he would see 400.
