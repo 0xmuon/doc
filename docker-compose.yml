@@ -1,0 +1,40 @@
+# two containers. db is postgres and api is fastapi. start both with:
+#   docker compose up --build
+# inside this network the api reaches postgres at host db, port 5432 (see DATABASE_URL).
+name: shopping-simple
+
+# run all services
+services:
+  # run service
+  db:
+    image: postgres:17-alpine
+    # postgres reads POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB from .env
+    # and creates that user and database the first time the volume is empty.
+    env_file:
+      - .env
+    ports:
+      # host:container. use localhost:5433 from a db client on your machine.
+      - "5433:5432"
+    volumes:
+      # named volume. data stays after docker compose down, and goes away with down -v.
+      - postgres_data:/var/lib/postgresql/data
+
+  # run service
+  api:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    # starts after the db container, not after postgres is ready to take connections.
+    # if api starts first, table creation fails and the app stops (container
+    # may still show running). fix with: docker compose restart api
+    depends_on:
+      - db
+    # mount the code and reload when files change while developing.
+    volumes:
+      - ./app:/code/app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+volumes:
+  postgres_data:

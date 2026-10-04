@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+greenlet
+psycopg[binary]
+pydantic-settings
+email-validator
+python-dotenv
+PyJWT
+httpx
+aiosqlite
+pytest
+pytest-cov

@@ -19,7 +19,7 @@ Write these down as you go:
 | --- | --- |
 | user_id | |
 | product_id (LED Desk Lamp) | |
-| cart_item_id | |
+| cart_id | |
 | order_id | |
 
 Use a new email if register returns **409**. Example: `verify.me@example.com`.
@@ -208,21 +208,43 @@ Expect **401** with the same `detail`. The API does not say whether the email ex
 }
 ```
 
-Expect **200**, `message` = `Login successful`, and the same `user_id` as register. No token. Later calls use `user_id` in the path or body.
+Expect **200**, `message` = `Login successful`, `token_type` = `bearer`, and the same `user_id` as register. Save `access_token`.
+
+`POST /api/auth/login` with the same body returns the same shape. Use either path.
+
+In Swagger, click **Authorize**, paste the token only, then **Authorize** again. Cart and order calls need this. Product calls do not.
 
 ---
 
-## 11. Cart — user does not exist (404)
+## 10b. Cart without a token (401)
 
-`GET /api/cart/99999`
+Leave Authorize empty, or click **Logout** there.
 
-Expect **404**:
+`GET /api/cart/{user_id}`
+
+Expect **401**:
 
 ```json
-{ "detail": "User not found" }
+{ "detail": "Valid token is required" }
 ```
 
-`GET /api/cart/99999/summary` is the same **404**.
+A made-up token such as `Authorization: Bearer not-a-real-token` is **401** `Invalid or expired token`.
+
+Turn Authorize back on before the cart steps below. If the path or body `user_id` is not your token's user, expect **403** `You can only access your own cart`.
+
+---
+
+## 11. Cart — another user's id (403)
+
+Authorize with your token, then `GET /api/cart/99999`.
+
+Expect **403**:
+
+```json
+{ "detail": "You can only access your own cart" }
+```
+
+`GET /api/cart/99999/summary` is the same **403**. The API does not look up user 99999 when the token belongs to someone else.
 
 ---
 
@@ -233,12 +255,14 @@ Expect **404**:
 Expect **200**:
 
 ```json
-{ "user_id": 1, "items": [] }
+{ "user_id": 1, "cart_id": null, "status": null, "items": [] }
 ```
+
+`cart_id` is null until the first add. There is no separate cart item id.
 
 `GET /api/cart/{user_id}/summary`
 
-Expect **200**, `distinct_items` 0, `total_quantity` 0, `total_amount` 0, `items` empty.
+Expect **200**, `cart_id` null, `distinct_items` 0, `total_quantity` 0, `total_amount` 0, `items` empty.
 
 ---
 
@@ -258,9 +282,9 @@ Use your real `user_id` and lamp `product_id`. Expect **422** because quantity m
 
 ---
 
-## 14. Add to cart — user or product does not exist (404)
+## 14. Add to cart — wrong user or missing product
 
-Unknown user:
+Unknown user, while Authorize has your token:
 
 ```json
 {
@@ -270,13 +294,13 @@ Unknown user:
 }
 ```
 
-Expect **404**:
+Expect **403**:
 
 ```json
-{ "detail": "User not found" }
+{ "detail": "You can only access your own cart" }
 ```
 
-Unknown product:
+Unknown product, with your real `user_id`:
 
 ```json
 {
@@ -311,8 +335,9 @@ Replace ids. Expect **201**. Check:
 - `unit_price` is 24.75
 - `line_total` is 49.5
 - `available_quantity` is still the old stock (add does not reduce stock)
+- `cart_id` is **1** for this user's first basket. Another user also starts at 1
 
-Save `cart_item_id`.
+There is no `cart_item_id`. The line is this cart plus the product.
 
 ---
 
@@ -320,7 +345,7 @@ Save `cart_item_id`.
 
 Send the same body with `"quantity": 1`.
 
-Expect **201**. `quantity` is now **3** (2 + 1). There is still one cart row, not two. `line_total` is **74.25**.
+Expect **201**. `quantity` is now **3** (2 + 1). There is still one line in cart **1**, not a second cart. `line_total` is **74.25**. `cart_id` is still 1.
 
 ---
 
@@ -360,15 +385,15 @@ Expect:
 
 ---
 
-## 19. Update cart — missing row (404)
+## 19. Update cart — product not in the open cart (404)
 
-`PUT /api/cart/update/99999`
+`PUT /api/cart/update/{user_id}/99999`
 
 ```json
 { "quantity": 1 }
 ```
 
-Expect **404**:
+Use your real `user_id`. Expect **404**:
 
 ```json
 { "detail": "Cart item must exist before update" }
@@ -378,13 +403,13 @@ Expect **404**:
 
 ## 20. Update cart — success (200)
 
-`PUT /api/cart/update/{cart_item_id}`
+`PUT /api/cart/update/{user_id}/{product_id}`
 
 ```json
 { "quantity": 1 }
 ```
 
-Expect **200**. `quantity` is 1. `line_total` is 24.75.
+Expect **200**. `quantity` is 1. `line_total` is 24.75. `cart_id` is still 1.
 
 This **sets** the quantity. It does not add 1 to the old quantity.
 
@@ -419,7 +444,7 @@ Expect **422**. Allowed values are `COD`, `CARD`, `UPI`, `NET_BANKING`.
 
 ## 23. Checkout — success (201)
 
-Set quantity to 2 first with `PUT /api/cart/update/{cart_item_id}` and `{ "quantity": 2 }`, so the total is easy to check (49.5).
+Set quantity to 2 first with `PUT /api/cart/update/{user_id}/{product_id}` and `{ "quantity": 2 }`, so the total is easy to check (49.5).
 
 ```json
 {
@@ -433,22 +458,23 @@ Expect **201**:
 - `message` = `Order placed successfully`
 - `payment_method` = `UPI` (lower case in the request is stored upper case)
 - `total_amount` = 49.5
+- `cart_id` = 1
 - one line, `quantity` 2, `price` 24.75, `line_total` 49.5
 
 Save `order_id`.
 
 Then check:
 
-- `GET /api/cart/{user_id}` → `items` is `[]`
+- `GET /api/cart/{user_id}` → `cart_id` is `null`, `status` is `null`, `items` is `[]`. Cart 1 is ordered, so it is no longer the open basket.
 - `GET /api/products/{lamp_id}` → `available_quantity` is 2 less than before checkout
 
 The client does not send the total. The server calculates it.
 
 ---
 
-## 24. Checkout — missing user or empty cart (400 / 404)
+## 24. Checkout — someone else's user or empty cart (403 / 400)
 
-Unknown user:
+Someone else's user id, with your token:
 
 ```json
 {
@@ -457,7 +483,7 @@ Unknown user:
 }
 ```
 
-Expect **404**: `User not found`.
+Expect **403**: `You can only access your own orders`.
 
 `user_id` of `0` is **422**: `User id must be greater than 0`.
 
@@ -477,11 +503,15 @@ Expect **400**:
 
 `GET /api/orders/{user_id}`
 
-Expect **200** and a list. The newest order is first. It has `order_id`, `order_date`, `payment_method` `UPI`, `total_amount` 49.5. History does not include line items.
+Expect **200** and a list. The newest order is first. It has `order_id`, `cart_id` 1, `order_date`, `payment_method` `UPI`, `total_amount` 49.5. History does not include line items.
+
+`GET /api/orders/me`
+
+Expect **200** and the same list as history. This path uses the token, so there is no user id in the URL.
 
 `GET /api/orders/99999`
 
-Expect **404**: `User not found`.
+Expect **403**: `You can only access your own orders`.
 
 ---
 
@@ -489,7 +519,7 @@ Expect **404**: `User not found`.
 
 `GET /api/orders/details/{order_id}`
 
-Expect **200**. Same total, and `items` contains the lamp line with the price copied at checkout (24.75).
+Expect **200**. `cart_id` is 1. Same total, and `items` contains the lamp line with the price copied at checkout (24.75).
 
 `GET /api/orders/details/99999`
 
@@ -515,9 +545,9 @@ Add another product so there is something to delete.
 }
 ```
 
-Use a real product id from the product list. Expect **201**. Save the new `cart_item_id`.
+Use a real product id from the product list. Expect **201**. `cart_id` is **2**, because cart 1 was already ordered.
 
-`DELETE /api/cart/remove/{cart_item_id}`
+`DELETE /api/cart/remove/{user_id}/{product_id}`
 
 Expect **200**:
 
@@ -525,9 +555,9 @@ Expect **200**:
 { "message": "Item removed from cart" }
 ```
 
-`GET /api/cart/{user_id}` no longer shows that line.
+`GET /api/cart/{user_id}` no longer shows that line. The open cart id stays 2. If that was the only line, `items` is `[]` and `status` is still `OPEN`.
 
-`DELETE /api/cart/remove/99999`
+`DELETE /api/cart/remove/{user_id}/99999`
 
 Expect **404**:
 
@@ -562,14 +592,16 @@ You already checked `upi` → `UPI`.
 - [ ] Register 201, no password in the response
 - [ ] Duplicate email 409
 - [ ] Wrong password and unknown email both 401
-- [ ] Login 200
-- [ ] Cart for missing user 404
+- [ ] Login 200 and save access_token
+- [ ] Cart without a token is 401
+- [ ] Cart for another user id is 403
 - [ ] Empty cart 200
 - [ ] Quantity 0 is 422
-- [ ] Missing user or product on add is 404
+- [ ] Missing product on add is 404
+- [ ] Add for another user id is 403
 - [ ] Search with no match returns `[]`
-- [ ] Checkout for a missing user is 404
-- [ ] Add 201, second add increases quantity
+- [ ] Checkout for another user is 403
+- [ ] First add returns cart_id 1, and the add after checkout returns cart_id 2
 - [ ] Over stock 400
 - [ ] Summary matches price times quantity
 - [ ] Update missing item 404
