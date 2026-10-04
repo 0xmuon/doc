@@ -11,6 +11,19 @@ docker compose up --build
 
 Open `http://127.0.0.1:8014/docs`. Postgres on your machine is `localhost:5444` (user `shop`, password `shop`, database `shopping`). The project root stays on port 8000, so this copy can run beside it.
 
+## Concepts used
+
+**Cart line identity.** Checkout loads the user’s `CartItems` by `UserID`. Each line’s id is `CartItemID`. The order does not store a `cart_id`. After the prices are copied and stock is reduced, those cart lines are deleted in the same commit.
+
+**A transaction has a boundary.** Postgres can commit the order, the order lines, the stock change, and the cart deletes together. The payment gateway is another process. It cannot join that commit. If the HTTP call sat inside the database transaction, a slow gateway would hold row locks, and a timeout could roll back an order the shopper had already been told about.
+
+**Save, then call, then record.** The order is inserted as `PENDING` and committed. `charge_order` runs after that. `PaymentStatus` becomes `PAID` or `FAILED` in a second commit. A decline is still **201** with `Order placed but payment failed`. It is not a **500**, and stock is not put back.
+
+**Timeout and retry.** `call_with_retry` calls the gateway, catches `GatewayError`, waits a short gap, and tries again, up to `PAYMENT_MAX_ATTEMPTS`. Each try is limited by `PAYMENT_TIMEOUT_SECONDS`. After the last failure the gateway function returns `FAILED` instead of raising into the route.
+
+**Idempotent retry.** `POST /api/payments/process` on an order that is already `PAID` returns that order and does not charge again. A retry does not reduce stock again, because stock moved in the first commit.
+
+**What “consistent” means here.** The order id, the lines, and the stock move are committed before the call. `PaymentStatus` after the call matches what the gateway said. `PENDING` means the charge was not finished. `FAILED` means the order exists and is unpaid.
 
 Week 3 milestone 4 is: implement an external API integration with retry and timeout handling.
 
@@ -20,10 +33,10 @@ The retry helper in this folder is only used by the payment call. The notificati
 
 ## Why the order is saved first
 
-Postgres can commit the order, the lines, the stock change, and the closed cart in one transaction. The gateway is another process. It cannot join that transaction. The sequence is:
+Postgres can commit the order, the lines, the stock change, and the cart-line deletes in one transaction. The gateway is another process. It cannot join that transaction. The sequence is:
 
-1. Check the open cart, stock, and payment method, as before.
-2. Insert the order with `PaymentStatus` `PENDING`, copy prices onto the lines, reduce stock, set the cart to `ORDERED`, and commit.
+1. Check that the user has at least one cart line, then check stock and the payment method.
+2. Insert the order with `PaymentStatus` `PENDING`, copy prices onto the lines, reduce stock, delete the cart lines, and commit.
 3. Call `charge_order`.
 4. Set `PaymentStatus` to `PAID` or `FAILED` and commit that status by itself.
 5. Return **201**. The message is `Order placed successfully` or `Order placed but payment failed`.
@@ -63,6 +76,6 @@ There is no live payment provider in this project. Point `PAYMENT_API_URL` at on
 
 ## What stays consistent
 
-The order id, the lines, the cart id, and the stock move are committed before the call. The payment status after the call matches the gateway result. A decline is `FAILED`, not a successful response with a paid order, and not an empty **500**.
+The order id, the lines, and the stock move are committed before the call. The payment status after the call matches the gateway result. A decline is `FAILED`, not a successful response with a paid order, and not an empty **500**.
 
 Customer order history, order details, and `GET /api/admin/orders` all include `payment_status`.

@@ -26,3 +26,26 @@ def ensure_columns(engine: Engine) -> None:
     with engine.begin() as conn:
         for statement in statements:
             conn.execute(text(statement))
+
+
+def drop_old_cart_shape(engine: Engine) -> None:
+    """week 2 cart is CartItemID.drop the basket tables if this db still has CartID on the line."""
+    if engine.dialect.name != "postgresql":
+        return
+    statement = """
+    DO $$
+    BEGIN
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'CartItems' AND column_name = 'CartID'
+        ) THEN
+            ALTER TABLE "Orders" DROP CONSTRAINT IF EXISTS fk_order_cart;
+            ALTER TABLE "Orders" DROP CONSTRAINT IF EXISTS uq_order_cart;
+            ALTER TABLE "Orders" DROP COLUMN IF EXISTS "CartID";
+            DROP TABLE IF EXISTS "CartItems";
+            DROP TABLE IF EXISTS "Carts";
+        END IF;
+    END $$;
+    """
+    with engine.begin() as conn:
+        conn.execute(text(statement))

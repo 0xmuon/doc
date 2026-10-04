@@ -11,6 +11,17 @@ docker compose up --build
 
 Open `http://127.0.0.1:8013/docs`. Postgres on your machine is `localhost:5443` (user `shop`, password `shop`, database `shopping`). The project root stays on port 8000, so this copy can run beside it.
 
+## Concepts used
+
+**Cart line identity.** Cart lines are still `CartItemID`. Deactivating a product does not invent a `cart_id`. An add of an inactive product is **404** because the public product must exist. An existing line is still updated or removed by its `cart_item_id`.
+
+**Authorization on the route.** These admin routes declare `catalog:manage` or `order:read:any`. The service writes the row. It does not re-check the role. Customer and support get **403** before the service runs. Admin passes.
+
+**Soft delete.** `IsActive` false hides the product from the public catalog. The row stays. `OrderDetails` and `CartItems` point at `Products`. Deleting the product row would break those foreign keys, and an old order would lose the name it already copied.
+
+**Uniqueness.** Category and product names are unique without caring about letter case. A second insert of the same name is **409**. That is a conflict with data that already exists, not a validation error (**422**) and not a missing row (**404**).
+
+**Two views of the catalog.** `GET /api/products` hides inactive rows. `GET /api/admin/products` includes them, so an admin can turn a product back on.
 
 Week 3 milestone 3 is: implement admin product, category, and order access APIs.
 

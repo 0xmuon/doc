@@ -1,8 +1,10 @@
 """order routes.caller is taken from the token,not trusted from the path alone."""
 
 from fastapi import APIRouter, BackgroundTasks, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
+from app.db.async_session import get_async_db
 from app.db.session import get_db
 from app.integrations.notification import send_order_notification
 from app.models.user import User
@@ -14,14 +16,14 @@ router = APIRouter(tags=["Orders"], dependencies=[Depends(get_current_user)])
 
 
 @router.post("/orders/checkout", response_model=CheckoutResponse, status_code=201, summary="Place an order")
-def checkout(
+async def checkout(
     payload: CheckoutRequest,
     background: BackgroundTasks,
     current: User = Depends(require_permission("order:write")),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ):
     require_owner(current, payload.user_id, "orders")
-    result = order_service.checkout(db, payload)
+    result = await order_service.checkout(db, payload)
     # notice runs after the response.a slow email must not hold checkout.
     background.add_task(
         send_order_notification,

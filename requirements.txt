@@ -7,6 +7,7 @@ pydantic-settings
 email-validator
 python-dotenv
 PyJWT
+casbin
 httpx
 aiosqlite
 pytest

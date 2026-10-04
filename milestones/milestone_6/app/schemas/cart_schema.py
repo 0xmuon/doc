@@ -14,7 +14,7 @@ class CartUpdateRequest(BaseModel):
 
 
 class CartItemResponse(BaseModel):
-    cart_id: int
+    cart_item_id: int
     user_id: int
     product_id: int
     product_name: str
@@ -26,14 +26,11 @@ class CartItemResponse(BaseModel):
 
 class CartResponse(BaseModel):
     user_id: int
-    cart_id: int | None
-    status: str | None
     items: list[CartItemResponse]
 
 
 class CartSummaryResponse(BaseModel):
     user_id: int
-    cart_id: int | None
     distinct_items: int
     total_quantity: int
     total_amount: float

@@ -11,6 +11,21 @@ docker compose up --build
 
 Open `http://127.0.0.1:8012/docs`. Postgres on your machine is `localhost:5442` (user `shop`, password `shop`, database `shopping`). The project root stays on port 8000, so this copy can run beside it.
 
+## Concepts used
+
+**Cart line identity.** The cart is still the week 2 line: `CartItemID`, `UserID`, `ProductID`, `Quantity`. Update and remove take `{cart_item_id}`. The token must own that line. There is no basket `cart_id`.
+
+**Role-based access control.** A role is a named bundle of permissions. This app has `CUSTOMER`, `ADMIN`, and `SUPPORT`. A route asks for a permission such as `cart:write` or `order:read:any`. It does not write `if role == "ADMIN"`.
+
+**One permission map.** `app/utils/permissions.py` is the policy. Adding a permission means editing that map and the route that needs it. An unknown role is denied.
+
+**Deny by default.** If the role is missing from the map, or the map does not list that permission, the answer is **403** `You do not have access to this action`.
+
+**The database is the authority.** The JWT may include `role` so a screen can show the right menu. `get_current_user` ignores that claim and reads `Users.Role`. A role change applies on the next request, without waiting for the token to expire.
+
+**Two different checks.** The permission check asks “may this role do this kind of action?” `require_owner` asks “is this this person’s own cart or order?” Support has `order:read:any`, so they can read any order, and they have no cart permission, so their own cart is still **403**. Permission is checked first, so that **403** is the permission message, not the “own cart” message.
+
+**A dependency that takes an argument.** `require_permission("cart:write")` returns a FastAPI dependency. It depends on `get_current_user`, and FastAPI runs that inner dependency once per request.
 
 Week 3 milestone 2 is: implement role-based / policy-based authorization with reusable access checks.
 

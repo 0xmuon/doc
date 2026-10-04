@@ -1,34 +1,25 @@
-"""cart table work.open cart is the basket that is not ordered yet."""
+"""cart lines.one row per user and product,found by CartItemID."""
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.cart import CART_OPEN, Cart, CartItem
+from app.models.cart import CartItem
 
 
-def _open_cart_query():
-    return select(Cart).options(joinedload(Cart.items).joinedload(CartItem.product))
+def _with_product():
+    return select(CartItem).options(joinedload(CartItem.product)).order_by(CartItem.cart_item_id)
 
 
-def get_open_cart(db: Session, user_id: int) -> Cart | None:
-    statement = _open_cart_query().where(Cart.user_id == user_id, Cart.status == CART_OPEN)
-    return db.scalars(statement).unique().one_or_none()
+def list_for_user(db: Session, user_id: int) -> list[CartItem]:
+    statement = _with_product().where(CartItem.user_id == user_id)
+    return list(db.scalars(statement).unique().all())
 
 
-def next_cart_id(db: Session, user_id: int) -> int:
-    # first basket for this user is 1,even if some other user already has carts.
-    current = db.scalar(select(func.max(Cart.cart_id)).where(Cart.user_id == user_id))
-    return int(current or 0) + 1
+def get_by_id(db: Session, cart_item_id: int) -> CartItem | None:
+    statement = _with_product().where(CartItem.cart_item_id == cart_item_id)
+    return db.scalar(statement)
 
 
-def get_line(db: Session, user_id: int, cart_id: int, product_id: int) -> CartItem | None:
-    statement = (
-        select(CartItem)
-        .options(joinedload(CartItem.product))
-        .where(
-            CartItem.user_id == user_id,
-            CartItem.cart_id == cart_id,
-            CartItem.product_id == product_id,
-        )
-    )
+def get_by_user_product(db: Session, user_id: int, product_id: int) -> CartItem | None:
+    statement = _with_product().where(CartItem.user_id == user_id, CartItem.product_id == product_id)
     return db.scalar(statement)

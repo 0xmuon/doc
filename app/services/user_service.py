@@ -5,11 +5,11 @@ from sqlalchemy.orm import Session
 
 from app.models.user import User
 from app.repositories import user_repository
-from app.schemas.user_schema import LoginResponse, RoleUpdate, UserCreate, UserLogin, UserResponse
+from app.schemas.user_schema import LoginResponse, RefreshRequest, RoleUpdate, UserCreate, UserLogin, UserResponse
 from app.utils.exceptions import ConflictException, ForbiddenException, NotFoundException, UnauthorizedException
 from app.utils.permissions import ADMIN
 from app.utils.helpers import hash_password, verify_password
-from app.utils.security import create_access_token
+from app.utils.security import create_access_token, create_refresh_token, decode_refresh_token
 
 
 def register_user(db: Session, payload: UserCreate) -> User:
@@ -37,13 +37,30 @@ def login_user(db: Session, payload: UserLogin) -> LoginResponse:
     if user is None or not verify_password(payload.password, user.password):
         raise UnauthorizedException("Invalid email or password")
     # token is issued only after the hash matches.cart and orders will ask for it.
-    token = create_access_token(user.user_id, user.email, user.role)
+    return _tokens(user)
+
+
+def _tokens(user: User) -> LoginResponse:
     return LoginResponse(
         message="Login successful",
-        access_token=token,
+        access_token=create_access_token(user.user_id, user.email, user.role),
+        refresh_token=create_refresh_token(user.user_id, user.email, user.role),
         token_type="bearer",
         user=UserResponse.model_validate(user),
     )
+
+
+def refresh_session(db: Session, payload: RefreshRequest) -> LoginResponse:
+    """swap a refresh token for a new pair.an access token is refused here."""
+    data = decode_refresh_token(payload.refresh_token)
+    try:
+        user_id = int(data.get("sub"))
+    except (TypeError, ValueError):
+        raise UnauthorizedException("Invalid or expired token")
+    user = user_repository.get_by_id(db, user_id)
+    if user is None:
+        raise UnauthorizedException("Invalid or expired token")
+    return _tokens(user)
 
 
 def change_role(db: Session, actor: User, user_id: int, payload: RoleUpdate) -> User:

@@ -11,10 +11,27 @@ docker compose up --build
 
 Open `http://127.0.0.1:8011/docs`. Postgres on your machine is `localhost:5441` (user `shop`, password `shop`, database `shopping`). The project root stays on port 8000, so this copy can run beside it.
 
+## Concepts used
+
+**Cart line identity.** Week 2’s `CartItems` table has `CartItemID` as an auto-generated primary key, plus `UserID`, `ProductID`, and `Quantity`. There is no `Carts` table and no `CartID` on `Orders`. `PUT /api/cart/update/{cart_item_id}` and `DELETE /api/cart/remove/{cart_item_id}` use that id. Adding the same product again keeps the same `cart_item_id` and increases `Quantity`. Checkout copies the current price onto `OrderDetails`, reduces stock, and deletes the cart lines.
+
+**JWT.** A JSON Web Token is a signed string the server can check without storing a session. Login signs it with HS256 using `JWT_SECRET`. The claims are `sub` (the user id), `email`, and `exp` (default 60 minutes). The password is never inside the token. Anyone who has the secret can forge a token, which is why the secret stays in `.env`.
+
+**Bearer authentication.** The client sends `Authorization: Bearer <token>`. `HTTPBearer(auto_error=False)` lets this app return **401** when the header is missing. FastAPI’s default for a missing bearer header is **403**, which would mix “not logged in” with “logged in but not allowed.”
+
+**Password hashing.** The stored value is `salt$hex` from PBKDF2-HMAC-SHA256. Login hashes the password the client sent and compares it. Unknown email and wrong password both return **401** `Invalid email or password`, so the response does not say which one failed.
+
+**Authentication and the owner check.** This milestone checks who you are (the token) and that the `user_id` on the cart or order is that person (`require_owner`). It does not check a role. That comes in milestone 2.
+
+**401 and 403.** **401** means the token is missing or not valid. **403** means the token is valid and the row belongs to someone else.
+
+**Dependencies.** FastAPI runs `get_current_user` before the route function. The service never sees a request that has not already been tied to a `Users` row.
+
+**Layers.** The request still goes router, then service, then repository, then the model. Pydantic checks the body before the service runs.
 
 Week 3 milestone 1 is: implement JWT-based authentication and protected routes.
 
-This folder stops at login and protected cart and order routes. Later milestones are the other folders. The week 3 sheet still says `cart_item_id`. This API uses a basket `cart_id` and a `product_id` on the line. That does not change here.
+This folder stops at login and protected cart and order routes. Later milestones are the other folders.
 
 ## What you get
 
@@ -43,7 +60,7 @@ Claims: `sub` is the user id as a string, `email`, `exp` (default 60 minutes), a
 
 `JWT_SECRET` and `JWT_EXPIRE_MINUTES` come from `.env`. The default secret is already 32 characters because HS256 warns on a short key.
 
-In Swagger (`http://127.0.0.1:8000/docs`), Authorize, and paste the token only. Do not type the word `Bearer`.
+In Swagger (`http://127.0.0.1:8011/docs`), Authorize, and paste the token only. Do not type the word `Bearer`.
 
 ## Who gets through
 
@@ -53,7 +70,7 @@ In Swagger (`http://127.0.0.1:8000/docs`), Authorize, and paste the token only. 
 | --- | --- |
 | No header, or the scheme is not Bearer | **401** `Valid token is required` |
 | Bad signature, expired token, bad `sub`, or the user row is gone | **401** `Invalid or expired token` |
-| Token is valid, but the `user_id` in the path or body is someone else | **403** `You can only access your own cart` or `You can only access your own orders` |
+| Token is valid, but the `user_id` or the `cart_item_id` belongs to someone else | **403** `You can only access your own cart` or `You can only access your own orders` |
 | Token user matches | The cart or order service runs |
 
 `GET /api/orders/me` uses the token user and has no path id. Order details load the order first: missing order is **404**, someone else's order is **403** (milestone 2 lets admin and support through).

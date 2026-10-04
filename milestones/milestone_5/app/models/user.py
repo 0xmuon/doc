@@ -20,5 +20,5 @@ class User(Base):
     # register always writes CUSTOMER.only an admin can change this later.
     role: Mapped[str] = mapped_column("Role", String(20), nullable=False, default="CUSTOMER", server_default="CUSTOMER")
 
-    carts: Mapped[list["Cart"]] = relationship(back_populates="user")
+    cart_items: Mapped[list["CartItem"]] = relationship(back_populates="user")
     orders: Mapped[list["Order"]] = relationship(back_populates="user")

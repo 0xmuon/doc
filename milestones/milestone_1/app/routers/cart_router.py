@@ -1,4 +1,4 @@
-"""cart routes.lines are found by user and product,and the caller must be that user."""
+"""cart routes.update and remove use CartItemID,the caller must own that line."""
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -42,32 +42,32 @@ def add_to_cart(
 
 
 @router.put(
-    "/cart/update/{user_id}/{product_id}",
+    "/cart/update/{cart_item_id}",
     response_model=CartItemResponse,
     summary="Update cart item quantity",
 )
 def update_cart_item(
-    user_id: int,
-    product_id: int,
+    cart_item_id: int,
     payload: CartUpdateRequest,
     current: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    require_owner(current, user_id, "cart")
-    return cart_service.update_item(db, user_id, product_id, payload)
+    item = cart_service.get_item(db, cart_item_id, "Cart item must exist before update")
+    require_owner(current, item.user_id, "cart")
+    return cart_service.update_item(db, item, payload)
 
 
 @router.delete(
-    "/cart/remove/{user_id}/{product_id}",
+    "/cart/remove/{cart_item_id}",
     response_model=MessageResponse,
     summary="Remove item from cart",
 )
 def remove_cart_item(
-    user_id: int,
-    product_id: int,
+    cart_item_id: int,
     current: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    require_owner(current, user_id, "cart")
-    cart_service.remove_item(db, user_id, product_id)
+    item = cart_service.get_item(db, cart_item_id, "Cart item must exist before delete")
+    require_owner(current, item.user_id, "cart")
+    cart_service.remove_item(db, item)
     return MessageResponse(message="Item removed from cart")

@@ -9,6 +9,8 @@ from contextvars import ContextVar
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
+from app.utils.metrics import record_request
+
 request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
 
 
@@ -38,12 +40,16 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             response.headers["X-Request-ID"] = request_id
+            elapsed = round((time.perf_counter() - started) * 1000, 1)
+            route = request.scope.get("route")
+            template = getattr(route, "path", request.url.path)
+            record_request(request.method, template, response.status_code, elapsed)
             log_event(
                 "request",
                 method=request.method,
                 path=request.url.path,
                 status=response.status_code,
-                ms=round((time.perf_counter() - started) * 1000, 1),
+                ms=elapsed,
             )
             return response
         except Exception:

@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 
 import app.models  # noqa: F401  so tables get registered before create_all
 from app.db.base import Base
-from app.db.migrate import ensure_columns
+from app.db.migrate import drop_old_cart_shape, ensure_columns
 from app.db.seed import seed_database, seed_staff
 from app.db.session import engine
 from app.routers import admin_router, auth_router, cart_router, order_router, product_router, user_router
@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     # first make tables,then put sample products only if db is empty.
+    # drop the basket tables if this database still has CartID on CartItems.
+    drop_old_cart_shape(engine)
     Base.metadata.create_all(bind=engine)
     ensure_columns(engine)
     seed_database()

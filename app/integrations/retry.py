@@ -1,27 +1,37 @@
-"""small retry loop for calls that can time out.not a second framework."""
+"""retry only the failures that might clear.a decline is a no,and a no is not retried."""
 
-import time
-from collections.abc import Callable
-from typing import TypeVar
+import asyncio
+import logging
+from collections.abc import Awaitable, Callable
 
-T = TypeVar("T")
+logger = logging.getLogger("shopping")
 
 
 class GatewayError(Exception):
-    """the other system did not give a usable answer."""
+    """timeout,connection error,or 5xx.these can be tried again."""
 
 
-def call_with_retry(fn: Callable[[float], T], attempts: int, timeout: float, pause: float = 0.05) -> T:
-    """try fn(timeout) up to attempts times.timeouts and gateway errors both retry."""
+class DeclineError(GatewayError):
+    """the gateway answered no.do not retry and do not open the breaker."""
+
+
+async def retry_async(func: Callable[..., Awaitable], *args, attempts: int, base_delay: float, operation: str):
+    """await func up to attempts times.DeclineError stops the loop on the first no."""
     if attempts < 1:
         raise GatewayError("Payment attempt count must be at least 1")
     last: Exception | None = None
     for attempt in range(1, attempts + 1):
         try:
-            return fn(timeout)
+            return await func(*args)
+        except DeclineError:
+            raise
         except GatewayError as exc:
             last = exc
-            if attempt == attempts:
+            if attempt >= attempts:
+                logger.warning("%s failed after %d attempts: %s", operation, attempts, exc)
                 break
-            time.sleep(pause)
+            delay = base_delay * (2 ** (attempt - 1))
+            logger.warning("%s failed (attempt %d/%d); retrying in %.2fs", operation, attempt, attempts, delay)
+            if delay:
+                await asyncio.sleep(delay)
     raise GatewayError(str(last) if last else "External call failed")

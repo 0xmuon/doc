@@ -1,8 +1,7 @@
-"""checkout copies price on the order,reduces stock,and closes the open cart in one commit."""
+"""checkout copies price on the order,reduces stock,and clears the cart lines in one commit."""
 
 from sqlalchemy.orm import Session
 
-from app.models.cart import CART_ORDERED
 from app.models.order import Order, OrderDetail
 from app.repositories import cart_repository, order_repository, user_repository
 from app.schemas.order_schema import (
@@ -20,7 +19,6 @@ def _history(order: Order) -> OrderHistoryItem:
     return OrderHistoryItem(
         order_id=order.order_id,
         user_id=order.user_id,
-        cart_id=order.cart_id,
         order_date=order.order_date,
         payment_method=order.payment_method,
         total_amount=float(to_money(order.total_amount)),
@@ -53,12 +51,12 @@ def checkout(db: Session, payload: CheckoutRequest) -> CheckoutResponse:
     user = user_repository.get_by_id(db, payload.user_id)
     if user is None:
         raise NotFoundException("User not found")
-    cart = cart_repository.get_open_cart(db, payload.user_id)
-    if cart is None or not cart.items:
+    items = cart_repository.list_for_user(db, payload.user_id)
+    if not items:
         raise AppException("User must have at least one cart item before checkout")
 
     total = to_money(0)
-    for item in cart.items:
+    for item in items:
         # check stock again here,someone else may have bought it after it was in cart.
         if item.quantity > item.product.available_quantity:
             raise AppException("Ordered quantity must not exceed available quantity")
@@ -69,13 +67,12 @@ def checkout(db: Session, payload: CheckoutRequest) -> CheckoutResponse:
         db,
         Order(
             user_id=payload.user_id,
-            cart_id=cart.cart_id,
             order_date=utcnow(),
             payment_method=payload.payment_method,
             total_amount=total,
         ),
     )
-    for item in cart.items:
+    for item in items:
         unit_price = to_money(item.product.price)
         db.add(
             OrderDetail(
@@ -86,8 +83,9 @@ def checkout(db: Session, payload: CheckoutRequest) -> CheckoutResponse:
             )
         )
         item.product.available_quantity -= item.quantity
-    # close this basket.the lines stay on it,but it is no longer the open cart.
-    cart.status = CART_ORDERED
+    # week 2 cart is the lines.checkout removes them after the order is built.
+    for item in items:
+        db.delete(item)
     # one commit so if it fails,stock,cart and order stay as they were.
     db.commit()
     saved = order_repository.get_by_id(db, order.order_id)

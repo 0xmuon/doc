@@ -40,7 +40,6 @@ class OrderLineResponse(BaseModel):
 class OrderHistoryItem(BaseModel):
     order_id: int
     user_id: int
-    cart_id: int
     order_date: datetime
     payment_method: str
     payment_status: str

@@ -11,6 +11,19 @@ docker compose up --build
 
 Open `http://127.0.0.1:8015/docs`. Postgres on your machine is `localhost:5445` (user `shop`, password `shop`, database `shopping`). The project root stays on port 8000, so this copy can run beside it.
 
+## Concepts used
+
+**Cart line identity.** Cart add, update, remove, and checkout stay synchronous and still use `CartItemID`. Async is only the category read. Checkout still deletes the cart lines in the same commit as the order.
+
+**The event loop.** An `async def` route runs on one loop. A blocking database call inside that function stops every other async request until it returns. A normal `def` route is run in a threadpool, so a blocking Postgres call there does not freeze `GET /api/categories`.
+
+**Async SQLAlchemy.** The category route uses `create_async_engine` and an async session. psycopg 3 can speak asyncio, so the Postgres URL stays `postgresql+psycopg://`. Tests use sqlite, and that async driver is `aiosqlite`. The async engine rewrites `sqlite://` to `sqlite+aiosqlite://` and leaves the Postgres URL alone.
+
+**Background tasks.** `BackgroundTasks` runs `send_order_notification` after the checkout response is ready to send. The shopper is not waiting on the notice. If the notice fails, the order stays. The failure is logged.
+
+**Structured logs.** Each request writes one JSON line: method, path, status, duration, and `request_id`. If the client did not send `X-Request-ID`, the middleware makes one and puts it on the response. The id is stored in a `contextvar` so later log lines in that request can include it. The middleware is added last, which makes it the outermost layer, so it sees the status code the route actually returned.
+
+**Exceptions.** `AppException` and its subclasses (`NotFoundException`, `ConflictException`, `UnauthorizedException`, `ForbiddenException`) become the status codes the routes already use. An unexpected error is logged as `unhandled_error` and returned as **500** with a generic `detail`. The traceback stays in the log, not in the response body.
 
 Week 3 milestone 5 is: async processing, background tasks, logging, and exception handling.
 

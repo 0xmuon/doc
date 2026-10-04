@@ -11,6 +11,19 @@ docker compose up --build
 
 Open `http://127.0.0.1:8016/docs`. Postgres on your machine is `localhost:5446` (user `shop`, password `shop`, database `shopping`). The project root stays on port 8000, so this copy can run beside it.
 
+## Concepts used
+
+**Cart line identity.** The checkout test adds a product and checks that the response has a `cart_item_id`. The order response does not have a `cart_id`. Checkout still deletes those cart lines after copying the price.
+
+**Unit and integration tests.** `tests/test_retry.py` calls the retry helper directly. There is no HTTP server in that test. `tests/test_api.py` and `tests/test_permissions.py` use FastAPI’s `TestClient`, which starts the app, runs the lifespan (create tables, seed), and sends real HTTP calls against it.
+
+**A database that is not Docker.** `tests/conftest.py` deletes `.pytest_shopping.db` and sets `DATABASE_URL` to that file before `app` is imported. `load_dotenv` does not override a variable that is already set, so the tests never talk to the Postgres volume. Wiping that volume is not part of the test run.
+
+**Why a file, not memory.** The sync engine and the async category engine must see the same rows. Two connections to `sqlite:///:memory:` would be two empty databases. A file is one database both engines can open.
+
+**Coverage.** `pytest-cov` reports which lines ran. The last run was 9 passed and about 83% of `app/`. The number is a report. It does not fail the command when a line was skipped.
+
+**Git and secrets.** `.env` has the database password and `JWT_SECRET`. It is gitignored. `.env.example` lists the names without being the live secret file. `__pycache__`, `.venv`, the pytest database, and coverage output are ignored too.
 
 Week 3 milestone 6 is: add unit testing, coverage validation, and finalize Git-based delivery.
 
@@ -67,4 +80,4 @@ Each folder under `milestones/` is its own app and its own database volume. The 
 | `milestones/milestone_5` | Async categories, background notification, JSON request logs |
 | `milestones/milestone_6` | This test run and the git notes above |
 
-Cart ids still start at 1 for each user. Models stay in `app/models`. The database in Docker is still Postgres.
+A cart line is `CartItemID`. Models stay in `app/models`. The database in Docker is still Postgres.

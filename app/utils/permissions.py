@@ -1,26 +1,25 @@
-"""role to permission map.routes ask for a permission,they dont name a role."""
+"""role names stay here.who can do what is asked from casbin,not from a second map."""
+
+from app.policy import allow
 
 CUSTOMER = "CUSTOMER"
 ADMIN = "ADMIN"
 SUPPORT = "SUPPORT"
 ROLES = (CUSTOMER, ADMIN, SUPPORT)
 
-# one place for who can do what.a new role is a new row here,not a new if in every route.
-ROLE_PERMISSIONS: dict[str, set[str]] = {
-    CUSTOMER: {"cart:read", "cart:write", "order:read:own", "order:write"},
-    ADMIN: {
-        "cart:read",
-        "cart:write",
-        "order:read:own",
-        "order:read:any",
-        "order:write",
-        "catalog:manage",
-        "user:role",
-    },
-    SUPPORT: {"order:read:own", "order:read:any"},
+# permission string the routes already use,turned into a casbin resource and action.
+_ACTIONS = {
+    "cart:read": ("cart", "read"),
+    "cart:write": ("cart", "write"),
+    "order:read:own": ("order", "read_own"),
+    "order:read:any": ("order", "read_any"),
+    "order:write": ("order", "write"),
+    "catalog:manage": ("catalog", "manage"),
+    "user:role": ("user", "role"),
 }
 
 
 def has_permission(role: str, permission: str) -> bool:
     """unknown role is deny.allways,never fall back to customer."""
-    return permission in ROLE_PERMISSIONS.get(role, set())
+    resource, action = _ACTIONS.get(permission, ("", permission))
+    return allow(role, None, resource, action, None)

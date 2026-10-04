@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.user import User
 from app.repositories import user_repository
+from app.policy import allow
 from app.utils.exceptions import ForbiddenException, UnauthorizedException
 from app.utils.permissions import has_permission
 from app.utils.security import decode_access_token
@@ -34,9 +35,11 @@ def get_current_user(
 
 
 def require_owner(current_user: User, user_id: int, what: str) -> None:
-    """token user and the id in the path or body have to be the same person."""
-    if current_user.user_id != user_id:
-        raise ForbiddenException(f"You can only access your own {what}")
+    """casbin own-rule.the token user and the row user have to be the same person."""
+    resource = "cart" if what == "cart" else "order"
+    if allow(current_user.role, current_user.user_id, resource, "own", user_id):
+        return
+    raise ForbiddenException(f"You can only access your own {what}")
 
 
 def require_permission(permission: str):
@@ -52,9 +55,7 @@ def require_permission(permission: str):
 
 def require_order_access(current_user: User, user_id: int) -> None:
     """admin and support can open any order.a customer only opens their own."""
-    if has_permission(current_user.role, "order:read:any"):
-        return
-    if has_permission(current_user.role, "order:read:own") and current_user.user_id == user_id:
+    if allow(current_user.role, current_user.user_id, "order", "read", user_id):
         return
     if has_permission(current_user.role, "order:read:own"):
         raise ForbiddenException("You can only access your own orders")
