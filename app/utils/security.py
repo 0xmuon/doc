@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from dotenv import load_dotenv
 
-from app.utils.exceptions import UnauthorizedException
+from app.utils import UnauthorizedException
 
 load_dotenv()
 

@@ -1,6 +1,7 @@
-# two containers. db is postgres and api is fastapi. start both with:
+# three containers. db is postgres, api is fastapi, provider is the stand-in for charges and email.
 #   docker compose up --build
 # inside this network the api reaches postgres at host db, port 5432 (see DATABASE_URL).
+# the api reaches the stand-in at http://provider:9000.
 name: shopping-simple
 
 # run all services
@@ -18,6 +19,11 @@ services:
     volumes:
       # named volume. data stays after docker compose down, and goes away with down -v.
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   # run service
   api:
@@ -26,15 +32,44 @@ services:
       - .env
     ports:
       - "8000:8000"
-    # starts after the db container, not after postgres is ready to take connections.
-    # if api starts first, table creation fails and the app stops (container
-    # may still show running). fix with: docker compose restart api
+      # debugpy: attach VS Code with "Attach to API in Docker".
+      - "5678:5678"
+    # wait until postgres accepts connections, then start.
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      provider:
+        condition: service_started
     # mount the code and reload when files change while developing.
     volumes:
       - ./app:/code/app
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+      - ./provider:/code/provider
+      - ./tests:/code/tests
+      - ./pytest.ini:/code/pytest.ini
+      - ./pyproject.toml:/code/pyproject.toml
+      - ./.coveragerc:/code/.coveragerc
+    command:
+      - python
+      - -m
+      - debugpy
+      - --listen
+      - 0.0.0.0:5678
+      - -m
+      - uvicorn
+      - app.main:app
+      - --host=0.0.0.0
+      - --port=8000
+      - --reload
+
+  # stand-in for charges and email.the api calls http://provider:9000.
+  provider:
+    build: .
+    ports:
+      # from your machine: http://localhost:9000/docs and PUT /mode/ok|fail|slow
+      - "9000:9000"
+    volumes:
+      - ./provider:/code/provider
+    command: ["uvicorn", "provider.main:app", "--host", "0.0.0.0", "--port", "9000", "--reload"]
 
 volumes:
   postgres_data:

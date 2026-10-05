@@ -3,35 +3,28 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.models.user import User
-from app.schemas.cart_schema import (
+from app.db import get_db
+from app.models import User
+from app.schemas import (
     CartAddRequest,
     CartItemResponse,
     CartResponse,
-    CartSummaryResponse,
     CartUpdateRequest,
     MessageResponse,
 )
 from app.services import cart_service
-from app.utils.deps import get_current_user, require_owner, require_permission
+from app.utils import get_current_user, require_owner, require_permission
 
 router = APIRouter(tags=["Cart"], dependencies=[Depends(get_current_user)])
 
 
-@router.get("/cart/{user_id}/summary", response_model=CartSummaryResponse, summary="View cart summary")
-def cart_summary(user_id: int, current: User = Depends(require_permission("cart:read")), db: Session = Depends(get_db)):
-    require_owner(current, user_id, "cart")
-    return cart_service.get_summary(db, user_id)
-
-
-@router.get("/cart/{user_id}", response_model=CartResponse, summary="View user cart")
+@router.get("/cart/{user_id}", response_model=CartResponse, summary="Cart")
 def view_cart(user_id: int, current: User = Depends(require_permission("cart:read")), db: Session = Depends(get_db)):
     require_owner(current, user_id, "cart")
     return cart_service.get_cart(db, user_id)
 
 
-@router.post("/cart/add", response_model=CartItemResponse, status_code=201, summary="Add item to cart")
+@router.post("/cart/add", response_model=CartItemResponse, status_code=201, summary="Add to cart")
 def add_to_cart(
     payload: CartAddRequest,
     current: User = Depends(require_permission("cart:write")),
@@ -44,7 +37,7 @@ def add_to_cart(
 @router.put(
     "/cart/update/{cart_item_id}",
     response_model=CartItemResponse,
-    summary="Update cart item quantity",
+    summary="Update cart",
 )
 def update_cart_item(
     cart_item_id: int,
@@ -60,7 +53,7 @@ def update_cart_item(
 @router.delete(
     "/cart/remove/{cart_item_id}",
     response_model=MessageResponse,
-    summary="Remove item from cart",
+    summary="Remove from cart",
 )
 def remove_cart_item(
     cart_item_id: int,

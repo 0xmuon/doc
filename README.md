@@ -33,7 +33,7 @@ In `.env`, change the host from `db` to `localhost` and the port from `5432` to 
 
 Open `http://127.0.0.1:8000/docs` for Swagger.
 
-Passwords are stored as salted hashes. Login checks the email and password against the Users table, then returns a JWT. Cart and order routes need that token in the `Authorization: Bearer` header. The `user_id` in the path or body must be the same user as the token. Product browse stays open. Sample catalog data is inserted on startup when the database is empty.
+Passwords are stored as argon2 hashes. Login checks the email and password against the Users table, then returns a JWT. Cart and order routes need that token in the `Authorization: Bearer` header. The `user_id` in the path or body must be the same user as the token. Product browse stays open. Sample categories, products, and three demo users are inserted on startup when those rows are missing: Rudraksh (admin), Navya (support), and Het (customer).
 
 ## API
 
@@ -48,14 +48,13 @@ Passwords are stored as salted hashes. Login checks the email and password again
 | GET | `/api/products/search?name=&category=` | Search by name and/or category |
 | GET | `/api/cart/{user_id}` | View cart (token required) |
 | POST | `/api/cart/add` | Add an item (token required) |
-| PUT | `/api/cart/update/{user_id}/{product_id}` | Set quantity on the open cart (token required) |
-| DELETE | `/api/cart/remove/{user_id}/{product_id}` | Remove a product from the open cart (token required) |
-| GET | `/api/cart/{user_id}/summary` | Cart totals (token required) |
+| PUT | `/api/cart/update/{cart_item_id}` | Set quantity on a cart line (token required) |
+| DELETE | `/api/cart/remove/{cart_item_id}` | Remove a cart line (token required) |
 | POST | `/api/orders/checkout` | Place an order (token required) |
 | GET | `/api/orders/me` | My order history (token required) |
-| GET | `/api/orders/{user_id}` | Order history for that user (token required) |
+| GET | `/api/admin/orders` | Every order (admin or support) |
 | GET | `/api/orders/details/{order_id}` | Order details (token required) |
 
 Payment methods: `COD`, `CARD`, `UPI`, `NET_BANKING`.
 
-Checkout checks that the open cart is not empty, that each quantity is still in stock, calculates the total from current prices, stores those prices on the order lines, reduces stock, and marks that cart as ordered. The next add opens a new cart for the same user, numbered 2, then 3, and so on. Each user's first cart is `cart_id` 1.
+Checkout checks that the cart is not empty, that each quantity is still in stock, calculates the total from current prices, stores those prices on the order lines, reduces stock, and removes the cart lines. A failed payment puts that stock back.

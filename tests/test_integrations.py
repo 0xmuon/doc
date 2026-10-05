@@ -5,10 +5,7 @@ import asyncio
 import httpx
 import pytest
 
-from app.integrations import payment_gateway
-from app.integrations.circuit_breaker import CircuitBreaker, CircuitOpenError
-from app.integrations.payment_gateway import charge_order, reset_breaker
-from app.integrations.retry import DeclineError, GatewayError
+from app.integrations import CircuitBreaker, CircuitOpenError, DeclineError, GatewayError, charge_order, payment_gateway, reset_breaker
 from tests.fakes import json_response, scripted_transport
 
 
@@ -72,7 +69,7 @@ def test_http_5xx_is_retried_then_paid(monkeypatch):
         calls["n"] += 1
         if calls["n"] < 3:
             return json_response(503, {"status": "FAILED"})
-        return json_response(200, {"status": "PAID"})
+        return json_response(200, {"status": "PAID", "reference": "PAY-TEST"})
 
     monkeypatch.setenv("PAYMENT_API_URL", "http://gateway.test/charge")
     monkeypatch.setenv("PAYMENT_MAX_ATTEMPTS", "3")
@@ -85,4 +82,5 @@ def test_http_5xx_is_retried_then_paid(monkeypatch):
         payment_gateway.http_transport = None
         reset_breaker()
     assert outcome.status == "PAID"
+    assert outcome.reference == "PAY-TEST"
     assert calls["n"] == 3

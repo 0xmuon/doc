@@ -6,7 +6,7 @@ import os
 
 import httpx
 
-from app.integrations.retry import DeclineError, GatewayError, retry_async
+from app.integrations import DeclineError, GatewayError, retry_async
 
 logger = logging.getLogger("shopping")
 

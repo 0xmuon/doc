@@ -40,7 +40,7 @@ Add cursor or offset pagination, and indexes that match the search filters (name
 
 ## Stock is not reserved in the cart
 
-A cart line does not hold stock. Stock drops when checkout commits. On Postgres, checkout locks the product rows (`FOR UPDATE`) so two checkouts cannot both take the last unit. On SQLite, used by the tests, that lock is skipped.
+A cart line does not hold stock. Stock drops when checkout commits. Checkout locks the product rows (`FOR UPDATE`) so two checkouts cannot both take the last unit.
 
 If payment then fails, the stock stays reduced. The order is `FAILED` and a retry does not reduce stock again. That avoids selling the same unit twice, and it also means a declined card holds inventory until someone restocks or cancels the order. There is no cancel route and no job that releases `FAILED` or stuck `PENDING` orders.
 
@@ -98,9 +98,9 @@ Send logs to one place, and pass the request id into the gateway call and the no
 
 ## Tests do not describe production
 
-Tests use a SQLite file so the sync pool and the async pool share rows. Postgres-only behavior (the stock lock, the startup `ALTER TABLE`s, the cart rebuild) is not what those tests run. There is no load test, no test that two checkouts race, and coverage is a report rather than a bar the build must pass. The suite is split between fakes and HTTP, which is the right shape, and it is still a small suite.
+HTTP tests use a separate Postgres database named `shopping_test` on the same server as the app. They do not wipe the shopping database. If `DATABASE_URL` already starts with `sqlite`, those tests use `test_ecommerce.db` instead. There is no load test, no test that two checkouts race, and coverage is a report rather than a bar the build must pass. The suite is split between fakes and HTTP, which is the right shape, and it is still a small suite.
 
-Run the race and migration tests against Postgres. Keep the fakes for the gateway. Add a threshold so a large drop in coverage fails the run.
+Add a test where two checkouts race for the last unit. Keep the fakes for the gateway. Add a threshold so a large drop in coverage fails the run.
 
 ## What to do first if this had to grow
 

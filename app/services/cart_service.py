@@ -2,17 +2,10 @@
 
 from sqlalchemy.orm import Session
 
-from app.models.cart import CartItem
+from app.models import CartItem
 from app.repositories import cart_repository, product_repository, user_repository
-from app.schemas.cart_schema import (
-    CartAddRequest,
-    CartItemResponse,
-    CartResponse,
-    CartSummaryResponse,
-    CartUpdateRequest,
-)
-from app.utils.exceptions import AppException, NotFoundException
-from app.utils.helpers import to_money
+from app.schemas import CartAddRequest, CartItemResponse, CartResponse, CartUpdateRequest
+from app.utils import AppException, NotFoundException, to_money
 
 
 def _require_user(db: Session, user_id: int):
@@ -49,19 +42,6 @@ def get_cart(db: Session, user_id: int) -> CartResponse:
     return CartResponse(user_id=user_id, items=[_to_item_response(item) for item in items])
 
 
-def get_summary(db: Session, user_id: int) -> CartSummaryResponse:
-    cart = get_cart(db, user_id)
-    total_quantity = sum(item.quantity for item in cart.items)
-    total_amount = to_money(sum(item.line_total for item in cart.items))
-    return CartSummaryResponse(
-        user_id=user_id,
-        distinct_items=len(cart.items),
-        total_quantity=total_quantity,
-        total_amount=float(total_amount),
-        items=cart.items,
-    )
-
-
 def get_item(db: Session, cart_item_id: int, missing: str) -> CartItem:
     item = cart_repository.get_by_id(db, cart_item_id)
     if item is None:
@@ -69,12 +49,10 @@ def get_item(db: Session, cart_item_id: int, missing: str) -> CartItem:
     return item
 
 
-def add_item(db: Session, payload: CartAddRequest, *, hide_inactive: bool = True) -> CartItemResponse:
+def add_item(db: Session, payload: CartAddRequest) -> CartItemResponse:
     _require_user(db, payload.user_id)
     product = product_repository.get_by_id(db, payload.product_id)
-    # is_active is missing on the earlier milestones,treat those products as active.
-    inactive = hide_inactive and product is not None and not getattr(product, "is_active", True)
-    if product is None or inactive:
+    if product is None or not product.is_active:
         raise NotFoundException("Product must exist before adding to cart")
 
     existing = cart_repository.get_by_user_product(db, payload.user_id, payload.product_id)

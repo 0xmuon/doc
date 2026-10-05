@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.utils.permissions import ROLES
+from app.utils import ROLES
 
 
 class UserCreate(BaseModel):
@@ -62,6 +62,7 @@ class UserResponse(BaseModel):
     email: str
     mobile: str
     role: str
+    is_active: bool
 
 
 class RoleUpdate(BaseModel):

@@ -1,8 +1,12 @@
-"""week 3 paths against the sqlite app.cart still uses product id,not a line id."""
+"""week 3 paths.cart still uses product id,not a line id."""
 
 import os
 
+import pytest
+
 from tests.helpers import auth, login, register
+
+pytestmark = pytest.mark.integration
 
 
 def test_browse_is_public_and_login_returns_role(client):
@@ -49,8 +53,8 @@ def test_cart_requires_token_and_own_user(client):
 
 
 def test_support_can_read_orders_but_not_cart_or_catalog(client):
-    support = login(client, "support@example.com", "support12345")
-    admin = login(client, "admin@example.com", "admin12345")
+    support = login(client, "navya@example.com", "navya1234")
+    admin = login(client, "rudraksh@example.com", "rudraksh1234")
     register(client, "shopper3@example.com")
     customer = login(client, "shopper3@example.com")
     customer_id = client.post(
@@ -59,7 +63,7 @@ def test_support_can_read_orders_but_not_cart_or_catalog(client):
 
     cart = client.get(f"/api/cart/{customer_id}", headers=auth(support))
     assert cart.status_code == 403
-    history = client.get(f"/api/orders/{customer_id}", headers=auth(support))
+    history = client.get("/api/admin/orders", headers=auth(support))
     assert history.status_code == 200
     blocked = client.post(
         "/api/admin/categories",
@@ -133,7 +137,7 @@ def test_checkout_payment_and_retry(client, monkeypatch):
     assert note.status_code == 200
     assert note.json()["message"] == "Notification queued"
 
-    admin = login(client, "admin@example.com", "admin12345")
+    admin = login(client, "rudraksh@example.com", "rudraksh1234")
     all_orders = client.get("/api/admin/orders", headers=auth(admin))
     assert all_orders.status_code == 200
     assert any(row["order_id"] == order_id for row in all_orders.json())
@@ -144,9 +148,9 @@ def test_checkout_payment_and_retry(client, monkeypatch):
 def test_role_change_applies_on_the_next_call(client):
     registered = register(client, "promote@example.com", name="Promote")
     user_id = registered["user"]["user_id"]
-    admin = login(client, "admin@example.com", "admin12345")
+    admin = login(client, "rudraksh@example.com", "rudraksh1234")
     admin_id = client.post(
-        "/api/auth/login", json={"email": "admin@example.com", "password": "admin12345"}
+        "/api/auth/login", json={"email": "rudraksh@example.com", "password": "rudraksh1234"}
     ).json()["user"]["user_id"]
     own = client.patch(
         f"/api/admin/users/{admin_id}/role",

@@ -5,8 +5,7 @@ from dataclasses import dataclass
 
 import httpx
 
-from app.integrations.circuit_breaker import CircuitBreaker, CircuitOpenError
-from app.integrations.retry import DeclineError, GatewayError, retry_async
+from app.integrations import CircuitBreaker, CircuitOpenError, DeclineError, GatewayError, retry_async
 
 PAID = "PAID"
 FAILED = "FAILED"
@@ -32,6 +31,7 @@ def reset_breaker() -> None:
 class PaymentOutcome:
     status: str
     detail: str
+    reference: str | None = None
 
 
 def _settings() -> tuple[int, float, float, str, str]:
@@ -43,17 +43,17 @@ def _settings() -> tuple[int, float, float, str, str]:
     return attempts, timeout, delay, mode, url
 
 
-async def _local_once() -> str:
+async def _local_once() -> tuple[str, str]:
     mode = os.getenv("PAYMENT_FORCE", "ok").strip().lower()
     if mode == "timeout":
         raise GatewayError("Payment gateway timed out")
     if mode == "fail":
         raise DeclineError("Payment gateway declined")
-    return PAID
+    return PAID, "PAY-LOCAL"
 
 
-async def _http_once(url: str, body: dict, timeout: float, order_id: int) -> str:
-    headers = {"Idempotency-Key": str(order_id)}
+async def _http_once(url: str, body: dict, timeout: float, idempotency_key: str) -> tuple[str, str]:
+    headers = {"Idempotency-Key": idempotency_key}
     try:
         async with httpx.AsyncClient(transport=http_transport, timeout=timeout) as client:
             response = await client.post(url, json=body, headers=headers)
@@ -67,31 +67,43 @@ async def _http_once(url: str, body: dict, timeout: float, order_id: int) -> str
         raise GatewayError(f"Payment gateway returned {response.status_code}")
     if response.status_code >= 400:
         raise DeclineError(f"Payment gateway returned {response.status_code}")
-    status = str(response.json().get("status", "")).upper()
-    if status != PAID:
+    payload = response.json()
+    status = str(payload.get("status", "")).upper()
+    reference = str(payload.get("reference") or "")
+    if status != PAID or not reference:
         raise DeclineError("Payment gateway declined")
-    return PAID
+    return PAID, reference
 
 
-async def _attempt(order_id: int, amount: str, method: str) -> str:
+async def _attempt(order_id: int, amount: str, method: str, order_number: str) -> tuple[str, str]:
     _attempts, timeout, _delay, _mode, url = _settings()
-    body = {"order_id": order_id, "amount": amount, "payment_method": method}
+    key = order_number or str(order_id)
+    body = {"order_id": order_id, "amount": amount, "payment_method": method, "order_number": order_number}
     if url:
-        return await _http_once(url, body, timeout, order_id)
+        return await _http_once(url, body, timeout, key)
     return await _local_once()
 
 
-async def charge_order(order_id: int, amount: str, method: str) -> PaymentOutcome:
+async def charge_order(order_id: int, amount: str, method: str, order_number: str = "") -> PaymentOutcome:
     """never raises into the route.the order stays,and the status is PAID or FAILED."""
     attempts, _timeout, delay, _mode, _url = _settings()
 
-    async def _with_retry() -> str:
-        return await retry_async(_attempt, order_id, amount, method, attempts=attempts, base_delay=delay, operation="payment")
+    async def _with_retry() -> tuple[str, str]:
+        return await retry_async(
+            _attempt,
+            order_id,
+            amount,
+            method,
+            order_number,
+            attempts=attempts,
+            base_delay=delay,
+            operation="payment",
+        )
 
     try:
-        await payment_breaker.call(_with_retry)
+        _status, reference = await payment_breaker.call(_with_retry)
     except DeclineError as exc:
         return PaymentOutcome(status=FAILED, detail=str(exc))
     except (GatewayError, CircuitOpenError) as exc:
         return PaymentOutcome(status=FAILED, detail=str(exc))
-    return PaymentOutcome(status=PAID, detail="Payment accepted")
+    return PaymentOutcome(status=PAID, detail="Payment accepted", reference=reference)

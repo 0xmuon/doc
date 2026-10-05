@@ -1,5 +1,9 @@
 """health and metrics over http.these do not need a token."""
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 
 def test_health_and_metrics(client):
     live = client.get("/health")

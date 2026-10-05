@@ -9,7 +9,7 @@ from contextvars import ContextVar
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
-from app.utils.metrics import record_request
+from app.utils import record_request
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
 

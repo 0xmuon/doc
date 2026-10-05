@@ -4,16 +4,13 @@ from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from app.db.async_session import get_async_db
-from app.db.session import get_db
-from app.integrations.notification import send_order_notification
-from app.models.user import User
-from app.schemas.order_schema import NotifyRequest, OrderResponse, PaymentProcessRequest
-from app.services import order_service
+from app.db import get_async_db, get_db
+from app.integrations import send_order_notification
+from app.models import User
 from app.policy import allow
-from app.utils.deps import get_current_user, require_order_access
-from app.utils.exceptions import ForbiddenException
-from app.utils.permissions import has_permission
+from app.schemas import NotifyRequest, OrderResponse, PaymentProcessRequest
+from app.services import order_service
+from app.utils import ForbiddenException, get_current_user, has_permission, require_order_access
 
 router = APIRouter(tags=["Operations"])
 
@@ -26,7 +23,7 @@ def _can_charge(current: User, owner_id: int) -> None:
     raise ForbiddenException("You do not have access to this action")
 
 
-@router.post("/payments/process", response_model=OrderResponse, summary="Retry payment for an order")
+@router.post("/payments/process", response_model=OrderResponse, summary="Retry payment")
 async def process_payment(
     payload: PaymentProcessRequest,
     current: User = Depends(get_current_user),
@@ -37,7 +34,7 @@ async def process_payment(
     return await order_service.retry_payment(db, payload.order_id)
 
 
-@router.post("/notifications/send", summary="Send an order notification in the background")
+@router.post("/notifications/send", summary="Notify")
 def send_notification(
     payload: NotifyRequest,
     background: BackgroundTasks,

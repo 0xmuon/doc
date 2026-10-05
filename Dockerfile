@@ -13,6 +13,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ app/
+COPY provider/ provider/
+COPY tests/ tests/
+COPY pytest.ini .
+COPY pyproject.toml .
+COPY .coveragerc .
 
 EXPOSE 8000
 

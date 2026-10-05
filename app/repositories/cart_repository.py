@@ -3,7 +3,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.cart import CartItem
+from app.models import CartItem
 
 
 def _with_product():

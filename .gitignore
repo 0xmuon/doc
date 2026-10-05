@@ -1,9 +1,22 @@
+# Secrets
+.env
+
+# Python
 __pycache__/
 *.py[cod]
 .venv/
-.env
-.DS_Store
+venv/
+
+# Tests and tools
 .pytest_cache/
-.pytest_shopping.db
+.ruff_cache/
 .coverage
 htmlcov/
+coverage.xml
+
+# Local databases
+*.db
+
+# Editors / OS
+.idea/
+.DS_Store

@@ -3,7 +3,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.order import Order, OrderDetail
+from app.models import Order, OrderDetail
 
 
 def _with_details():
@@ -17,12 +17,12 @@ def create(db: Session, order: Order) -> Order:
 
 
 def list_by_user(db: Session, user_id: int) -> list[Order]:
-    statement = _with_details().where(Order.user_id == user_id).order_by(Order.order_date.desc(), Order.order_id.desc())
+    statement = _with_details().where(Order.user_id == user_id).order_by(Order.created_at.desc(), Order.order_id.desc())
     return list(db.scalars(statement).unique().all())
 
 
 def list_all(db: Session) -> list[Order]:
-    statement = _with_details().order_by(Order.order_date.desc(), Order.order_id.desc())
+    statement = _with_details().order_by(Order.created_at.desc(), Order.order_id.desc())
     return list(db.scalars(statement).unique().all())
 
 

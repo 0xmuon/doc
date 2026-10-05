@@ -16,6 +16,7 @@ _ACTIONS = {
     "order:write": ("order", "write"),
     "catalog:manage": ("catalog", "manage"),
     "user:role": ("user", "role"),
+    "audit:read": ("audit", "read"),
 }
 
 

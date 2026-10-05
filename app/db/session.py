@@ -8,23 +8,24 @@ from sqlalchemy.orm import sessionmaker
 
 load_dotenv()
 
-# app databse is postgresql.
+# postgresql+psycopg://user:password@db:5432/shopping
+# sqlite+aiosqlite:///./ecommerce.db
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql+psycopg://shop:shop@localhost:5433/shopping",
 )
 
-connect_args: dict = {}
-engine_kwargs: dict = {}
-if DATABASE_URL.startswith("sqlite"):
-    # sqlite can get used from more then one thread,so this flag is needed.
-    connect_args["check_same_thread"] = False
-    if DATABASE_URL in {"sqlite://", "sqlite:///:memory:"}:
-        from sqlalchemy.pool import StaticPool
 
-        engine_kwargs["poolclass"] = StaticPool
+def _sync_url(url: str) -> str:
+    # a sqlite url names the async driver.the sync engine uses the plain sqlite driver.
+    if url.startswith("sqlite+aiosqlite"):
+        return "sqlite" + url[len("sqlite+aiosqlite") :]
+    return url
 
-engine = create_engine(DATABASE_URL, connect_args=connect_args, **engine_kwargs)
+
+SYNC_DATABASE_URL = _sync_url(DATABASE_URL)
+connect_args = {"check_same_thread": False} if SYNC_DATABASE_URL.startswith("sqlite") else {}
+engine = create_engine(SYNC_DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 

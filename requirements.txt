@@ -3,12 +3,16 @@ uvicorn[standard]
 sqlalchemy
 greenlet
 psycopg[binary]
+aiosqlite
 pydantic-settings
 email-validator
 python-dotenv
+python-multipart
 PyJWT
+pwdlib[argon2]
 casbin
 httpx
-aiosqlite
+debugpy
 pytest
 pytest-cov
+ruff

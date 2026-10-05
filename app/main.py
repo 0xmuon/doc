@@ -9,20 +9,17 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.openapi.utils import get_openapi
+from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import text
 
 import app.models  # noqa: F401  so tables get registered before create_all
-from app.db.async_session import AsyncSessionLocal
-from app.db.base import Base
-from app.db.migrate import drop_old_cart_shape, ensure_columns
-from app.db.seed import seed_database, seed_staff
-from app.db.session import engine
-from app.integrations.payment_gateway import payment_breaker
+from app.db import AsyncSessionLocal, Base, engine
+from app.db.seed import seed_database, seed_users
+from app.integrations import payment_breaker
 from app.routers import admin_router, auth_router, cart_router, ops_router, order_router, product_router, user_router
-from app.utils.exceptions import AppException
-from app.utils.logging_setup import RequestLogMiddleware, configure_logging, log_event, request_id_var
-from app.utils.metrics import metrics_report
+from app.utils import AppException, RequestLogMiddleware, configure_logging, log_event, metrics_report, request_id_var
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -30,22 +27,20 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # first make tables,then fill columns create_all will not alter,then seed.
+    # a fresh database comes from docker compose down -v.create_all builds the tables.
     configure_logging()
-    # drop the basket tables if this database still has CartID on CartItems.
-    drop_old_cart_shape(engine)
     Base.metadata.create_all(bind=engine)
-    ensure_columns(engine)
     seed_database()
-    seed_staff()
+    seed_users()
     yield
 
 
 app = FastAPI(
     title="Online Shopping Application API",
-    description="Shopping API with JWT login, Casbin checks, admin catalog, payment retry, and async checkout.",
+    description="",
     version="1.0.0",
     lifespan=lifespan,
+    docs_url=None,
 )
 
 app.add_middleware(
@@ -84,25 +79,67 @@ def root():
     return {"message": "Online Shopping API", "docs": "/docs"}
 
 
-@app.get("/health", summary="Liveness")
+@app.get("/docs", include_in_schema=False)
+async def swagger_ui():
+    page = get_swagger_ui_html(openapi_url=app.openapi_url, title=f"{app.title} - Swagger UI")
+    html = page.body.decode().replace("</head>", "<style>.scope-def{display:none}</style></head>")
+    return HTMLResponse(html)
+
+
+@app.get("/health", summary="Health")
 def health():
     return {"status": "ok"}
 
 
-@app.get("/health/db", summary="Database readiness")
+@app.get("/health/db", summary="Database")
 async def health_db():
     async with AsyncSessionLocal() as session:
         await session.execute(text("SELECT 1"))
     return {"status": "ok"}
 
 
-@app.get("/metrics", summary="Request totals since startup")
+@app.get("/metrics", summary="Metrics")
 def metrics():
     return {
         "routes": metrics_report(),
         "payment_circuit": {"state": payment_breaker.state, "failures": payment_breaker.failures},
     }
 
+
+def custom_openapi():
+    """authorize shows login (email as username) or a pasted jwt.either one is enough."""
+    if app.openapi_schema:
+        return app.openapi_schema
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    schemes = schema.setdefault("components", {}).setdefault("securitySchemes", {})
+    schemes["Login"] = {
+        "type": "oauth2",
+        "flows": {
+            "password": {
+                "tokenUrl": "/api/auth/token",
+                "scopes": {},
+            }
+        },
+    }
+    http_methods = {"get", "post", "put", "patch", "delete"}
+    for path_item in schema.get("paths", {}).values():
+        for method, operation in path_item.items():
+            if method not in http_methods or not isinstance(operation, dict):
+                continue
+            security = operation.get("security")
+            if not security or not any("JWT" in item for item in security):
+                continue
+            operation["security"] = [*security, {"Login": []}]
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = custom_openapi
 
 app.include_router(user_router.router, prefix="/api")
 app.include_router(auth_router.router, prefix="/api")

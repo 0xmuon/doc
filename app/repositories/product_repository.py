@@ -3,8 +3,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.category import Category
-from app.models.product import Product
+from app.models import Category, Product
 
 
 def list_categories(db: Session) -> list[Category]:
@@ -32,6 +31,10 @@ def get_category_by_name(db: Session, name: str) -> Category | None:
 
 def get_by_name(db: Session, name: str) -> Product | None:
     return db.scalar(select(Product).where(func.lower(Product.product_name) == name.strip().lower()))
+
+
+def get_by_sku(db: Session, sku: str) -> Product | None:
+    return db.scalar(select(Product).where(func.upper(Product.sku) == sku.strip().upper()))
 
 
 def get_by_id(db: Session, product_id: int) -> Product | None:

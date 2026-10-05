@@ -1,0 +1,13 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# relationship names are strings.sqlalchemy resolves them after every model is imported.
+"app/models/*.py" = ["F821"]
+# conftest sets DATABASE_URL before the app is imported.
+"tests/conftest.py" = ["E402"]

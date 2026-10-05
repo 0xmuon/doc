@@ -4,16 +4,15 @@ from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.models.user import User
-from app.repositories import user_repository
+from app.db import get_db
+from app.models import User
 from app.policy import allow
-from app.utils.exceptions import ForbiddenException, UnauthorizedException
-from app.utils.permissions import has_permission
-from app.utils.security import decode_access_token
+from app.repositories import user_repository
+from app.utils import ForbiddenException, UnauthorizedException, decode_access_token, has_permission
 
 # auto_error false so a missing header is our 401,not fastapi's default 403.
-bearer_scheme = HTTPBearer(auto_error=False)
+# scheme name JWT is the second box in swagger authorize.login is added beside it.
+bearer_scheme = HTTPBearer(auto_error=False, scheme_name="JWT")
 
 
 def get_current_user(
@@ -29,7 +28,7 @@ def get_current_user(
     except (TypeError, ValueError):
         raise UnauthorizedException("Invalid or expired token")
     user = user_repository.get_by_id(db, user_id)
-    if user is None:
+    if user is None or not user.is_active:
         raise UnauthorizedException("Invalid or expired token")
     return user
 

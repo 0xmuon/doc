@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, field_validator
 
-from app.utils.helpers import ALLOWED_PAYMENT_METHODS
+from app.utils import ALLOWED_PAYMENT_METHODS
 
 
 class CheckoutRequest(BaseModel):
@@ -39,10 +39,14 @@ class OrderLineResponse(BaseModel):
 
 class OrderHistoryItem(BaseModel):
     order_id: int
+    order_number: str
     user_id: int
     order_date: datetime
     payment_method: str
+    order_status: str
     payment_status: str
+    payment_reference: str | None = None
+    failure_reason: str | None = None
     total_amount: float
 
 

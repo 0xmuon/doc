@@ -3,17 +3,24 @@ import secrets
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
+from pwdlib import PasswordHash
+
 ALLOWED_PAYMENT_METHODS = ("COD", "CARD", "UPI", "NET_BANKING")
+_hasher = PasswordHash.recommended()
 
 
 def hash_password(password: str) -> str:
-    """keep salt and hash together as salt$hex,so no extra column is needed."""
-    salt = secrets.token_hex(16)
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100_000)
-    return f"{salt}${digest.hex()}"
+    """argon2 hash.the salt lives inside the hash string."""
+    return _hasher.hash(password)
 
 
 def verify_password(password: str, stored: str) -> bool:
+    if stored.startswith("$argon2"):
+        try:
+            return _hasher.verify(password, stored)
+        except Exception:
+            return False
+    # rows hashed before argon2 are salt$hex.they still match until the account is recreated.
     try:
         salt, digest = stored.split("$", 1)
     except ValueError:

@@ -29,13 +29,5 @@ class CartResponse(BaseModel):
     items: list[CartItemResponse]
 
 
-class CartSummaryResponse(BaseModel):
-    user_id: int
-    distinct_items: int
-    total_quantity: int
-    total_amount: float
-    items: list[CartItemResponse]
-
-
 class MessageResponse(BaseModel):
     message: str

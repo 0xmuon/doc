@@ -1,11 +1,13 @@
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
 
 class CartItem(Base):
-    """one line in the shopper cart.CartItemID is the id from week 2,auto generated."""
+    """one line per user and product.adding the same product again raises the quantity."""
 
     __tablename__ = "CartItems"
     __table_args__ = (
@@ -19,6 +21,8 @@ class CartItem(Base):
         "ProductID", Integer, ForeignKey("Products.ProductID"), nullable=False, index=True
     )
     quantity: Mapped[int] = mapped_column("Quantity", Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column("CreatedAt", DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column("UpdatedAt", DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     user: Mapped["User"] = relationship(back_populates="cart_items")
     product: Mapped["Product"] = relationship(back_populates="cart_items")

@@ -2,16 +2,16 @@
 
 from sqlalchemy.orm import Session
 
-from app.models.product import Product
+from app.models import Product
 from app.repositories import product_repository
-from app.schemas.product_schema import CategoryResponse, ProductResponse
-from app.utils.exceptions import NotFoundException
-from app.utils.helpers import to_money
+from app.schemas import CategoryResponse, ProductResponse
+from app.utils import NotFoundException, to_money
 
 
 def to_product_response(product: Product) -> ProductResponse:
     return ProductResponse(
         product_id=product.product_id,
+        sku=product.sku,
         product_name=product.product_name,
         description=product.description,
         category_id=product.category_id,

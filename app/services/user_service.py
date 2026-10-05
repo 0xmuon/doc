@@ -3,13 +3,21 @@
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.user import User
-from app.repositories import user_repository
-from app.schemas.user_schema import LoginResponse, RefreshRequest, RoleUpdate, UserCreate, UserLogin, UserResponse
-from app.utils.exceptions import ConflictException, ForbiddenException, NotFoundException, UnauthorizedException
-from app.utils.permissions import ADMIN
-from app.utils.helpers import hash_password, verify_password
-from app.utils.security import create_access_token, create_refresh_token, decode_refresh_token
+from app.models import User
+from app.repositories import audit_repository, user_repository
+from app.schemas import LoginResponse, RefreshRequest, RoleUpdate, UserCreate, UserLogin, UserResponse
+from app.utils import (
+    ADMIN,
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+    UnauthorizedException,
+    create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
+    hash_password,
+    verify_password,
+)
 
 
 def register_user(db: Session, payload: UserCreate) -> User:
@@ -36,6 +44,8 @@ def login_user(db: Session, payload: UserLogin) -> LoginResponse:
     # same message if user is not there or password is wrong.
     if user is None or not verify_password(payload.password, user.password):
         raise UnauthorizedException("Invalid email or password")
+    if not user.is_active:
+        raise UnauthorizedException("Account is inactive")
     # token is issued only after the hash matches.cart and orders will ask for it.
     return _tokens(user)
 
@@ -58,7 +68,7 @@ def refresh_session(db: Session, payload: RefreshRequest) -> LoginResponse:
     except (TypeError, ValueError):
         raise UnauthorizedException("Invalid or expired token")
     user = user_repository.get_by_id(db, user_id)
-    if user is None:
+    if user is None or not user.is_active:
         raise UnauthorizedException("Invalid or expired token")
     return _tokens(user)
 
@@ -73,6 +83,7 @@ def change_role(db: Session, actor: User, user_id: int, payload: RoleUpdate) -> 
     if user.role == ADMIN and payload.role != ADMIN and user_repository.count_by_role(db, ADMIN) <= 1:
         raise ConflictException("At least one admin is required")
     user.role = payload.role
+    audit_repository.record(db, actor.user_id, "update", "user", user.user_id, payload.role)
     db.commit()
     db.refresh(user)
     return user

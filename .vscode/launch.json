@@ -1,0 +1,34 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Attach to API in Docker",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": { "host": "localhost", "port": 5678 },
+      "pathMappings": [{ "localRoot": "${workspaceFolder}", "remoteRoot": "/code" }],
+      "justMyCode": true
+    },
+    {
+      "name": "Run API locally (SQLite)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--reload", "--port", "8000"],
+      "env": {
+        "DATABASE_URL": "sqlite+aiosqlite:///./ecommerce.db",
+        "PAYMENT_API_URL": "http://localhost:9000/payments/charge",
+        "NOTIFY_API_URL": "http://localhost:9000/notify"
+      },
+      "justMyCode": true
+    },
+    {
+      "name": "Run tests (SQLite)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "env": { "DATABASE_URL": "sqlite+aiosqlite:///./ecommerce.db" },
+      "justMyCode": false
+    }
+  ]
+}

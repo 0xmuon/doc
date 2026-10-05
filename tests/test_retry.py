@@ -2,7 +2,7 @@
 
 import asyncio
 
-from app.integrations.retry import DeclineError, GatewayError, retry_async
+from app.integrations import DeclineError, GatewayError, retry_async
 
 
 def test_retry_then_success():

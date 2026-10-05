@@ -20,6 +20,7 @@ p, CUSTOMER, payment, process, r.user_id == r.owner_id
 p, ADMIN, payment, process, true
 p, ADMIN, catalog, manage, true
 p, ADMIN, user, role, true
+p, ADMIN, audit, read, true
 p, CUSTOMER, notification, send, r.user_id == r.owner_id
 p, ADMIN, notification, send, true
 p, SUPPORT, notification, send, true
