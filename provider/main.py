@@ -13,13 +13,17 @@ import asyncio
 import secrets
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
 app = FastAPI(
     title="fake external apis(notification+payment)",
     description="",
     version="1.0.0",
+    openapi_tags=[
+        {"name": "Notifications", "description": "Email notices. A failed notice does not change the order."},
+        {"name": "Charges", "description": "Payment charges. The same Idempotency-Key is not charged twice."},
+    ],
 )
 
 Mode = Literal["ok", "fail", "slow"]
@@ -75,7 +79,7 @@ def clear_sent():
     return {"cleared": True}
 
 
-@app.post("/notify", include_in_schema=False)
+@app.post("/notify", tags=["Notifications"], summary="Send notice")
 async def notify(body: Notice):
     await _apply_mode()
     sent.append({"order_id": body.order_id, "email": body.email, "payment_status": body.payment_status})
@@ -86,9 +90,9 @@ async def notify(body: Notice):
     return {"status": "sent", "mode": mode}
 
 
-@app.post("/payments/charge", include_in_schema=False)
-async def charge(body: Charge, request: Request):
-    key = request.headers.get("idempotency-key", "")
+@app.post("/payments/charge", tags=["Charges"], summary="Charge")
+async def charge(body: Charge, idempotency_key: str = Header(default="")):
+    key = idempotency_key
     if key and key in charges:
         saved = charges[key]
         return {"status": "PAID", "reference": saved["reference"], "order_id": body.order_id}

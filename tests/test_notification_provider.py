@@ -46,8 +46,13 @@ def test_unknown_mode_is_422():
     assert rejected.status_code == 422
 
 
-def test_docs_only_list_the_mode_routes():
-    paths = client.get("/openapi.json").json()["paths"]
-    assert set(paths) == {"/mode", "/mode/{next_mode}"}
+def test_docs_list_mode_notices_and_charges():
+    schema = client.get("/openapi.json").json()
+    paths = schema["paths"]
+    assert set(paths) == {"/mode", "/mode/{next_mode}", "/notify", "/payments/charge"}
     assert set(paths["/mode"]) == {"get"}
     assert set(paths["/mode/{next_mode}"]) == {"put"}
+    assert paths["/notify"]["post"]["tags"] == ["Notifications"]
+    assert paths["/payments/charge"]["post"]["tags"] == ["Charges"]
+    assert "/sent" not in paths
+    assert "/payments/charges" not in paths
