@@ -1,5 +1,7 @@
 # Limits of this shopping API
 
+This note is older than the current app. Stock is released when a charge fails, startup does not run a migrate script, passwords are Argon2, and an audit log exists. Use `WEEK3_LIMITS.md` for the limits that are true now.
+
 This file is about the project as it runs today: one FastAPI app, one Postgres database, Docker Compose, and the week 3 features (JWT, Casbin, async checkout, payment retry, metrics, tests).
 
 It is a solid case-study API. It is not a system you would put in front of a large catalog or a sale with thousands of checkouts at once. Each section is a limit that exists in this code, why it matters when traffic or data grows, and the change that removes it.
