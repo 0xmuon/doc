@@ -6,11 +6,28 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import SearchBar from "../components/products/SearchBar";
 import ProductCard from "../components/products/ProductCard";
-import { api } from "../api/client";
-import { useAuth } from "../context/AuthContext";
-import { useCart } from "../context/CartContext";
+import { fetchCategories, fetchProducts, searchProducts } from "../api/productApi";
+import { useAuth } from "../context/auth-context";
+import { useCart } from "../context/cart-context";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { setCartQuantity } from "../utils/cartQuantity";
+
+/** Name matches the search route. A typed category is included too, because that route matches names only. */
+async function loadProducts(name, category) {
+  if (category) return searchProducts({ name, category });
+  if (!name) return fetchProducts();
+  const [byName, all] = await Promise.all([searchProducts({ name }), fetchProducts()]);
+  const query = name.toLowerCase();
+  const byCategory = all.filter((product) => (product.category_name || "").toLowerCase().includes(query));
+  const seen = new Set();
+  const merged = [];
+  for (const product of [...byName, ...byCategory]) {
+    if (seen.has(product.product_id)) continue;
+    seen.add(product.product_id);
+    merged.push(product);
+  }
+  return merged;
+}
 
 export default function ProductsPage() {
   const { token, user } = useAuth();
@@ -21,27 +38,25 @@ export default function ProductsPage() {
   const [category, setCategory] = useState("");
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
-  const [loaded, setLoaded] = useState(false);
+  const [loadedKey, setLoadedKey] = useState(null);
   const [error, setError] = useState("");
   const [pendingId, setPendingId] = useState(0);
   const [stockError, setStockError] = useState({ id: 0, message: "" });
   const pendingRef = useRef(0);
   const debouncedName = useDebouncedValue(name.trim(), 300);
+  const requestKey = `${debouncedName}|${category}`;
+  const loaded = loadedKey === requestKey;
 
   useEffect(() => {
-    api("/api/categories")
+    fetchCategories()
       .then(setCategories)
       .catch((err) => setError(err.message));
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (debouncedName) params.set("name", debouncedName);
-    if (category) params.set("category", category);
-    const path = params.size ? `/api/products/search?${params}` : "/api/products";
     let ignore = false;
-    setLoaded(false);
-    api(path)
+    const key = `${debouncedName}|${category}`;
+    loadProducts(debouncedName, category)
       .then((rows) => {
         if (ignore) return;
         const ordered = [...rows].sort(
@@ -49,12 +64,12 @@ export default function ProductsPage() {
         );
         setProducts(ordered);
         setError("");
+        setLoadedKey(key);
       })
       .catch((err) => {
-        if (!ignore) setError(err.message);
-      })
-      .finally(() => {
-        if (!ignore) setLoaded(true);
+        if (ignore) return;
+        setError(err.message);
+        setLoadedKey(key);
       });
     return () => {
       ignore = true;

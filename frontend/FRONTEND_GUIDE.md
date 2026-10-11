@@ -25,7 +25,11 @@ frontend/src/
   main.jsx                 starts React
   App.jsx                  route table
   index.css                Tailwind
-  api/client.js            every HTTP call, including token refresh
+  api/client.js            shared HTTP call, including token refresh
+  api/authApi.js           login, register, and the current user
+  api/cartApi.js           cart lines
+  api/orderApi.js          checkout, orders, and pay again
+  api/productApi.js        categories, list, search, and one product
   context/AuthContext.jsx  who is logged in
   context/CartContext.jsx  the cart and the header count
   hooks/useForm.js         field errors after blur and on submit
@@ -39,7 +43,7 @@ frontend/src/
   pages/                   one file per screen
 ```
 
-A click does not talk to the database. The page calls `api()` in `api/client.js`. During `npm run dev`, Vite sends `/api` to `http://localhost:8000`, so the React code does not hard-code that host. The function sends JSON when there is a body, and sends `Authorization: Bearer <token>` when a token is available. If the response is not OK, it throws `ApiError` with FastAPI’s `detail` string, the HTTP status, and per-field messages when `detail` is a list. The page catches that and shows `error.message` in red.
+A click does not talk to the database. Screens call `authApi`, `cartApi`, `orderApi`, or `productApi`. Those files call `api()` in `api/client.js`. During `npm run dev`, Vite sends `/api` to `http://localhost:8000`, so the React code does not hard-code that host. The function sends JSON when there is a body, and sends `Authorization: Bearer <token>` when a token is available. Login stays `POST /api/auth/login` with `{ email, password }`. Register stays `POST /api/users/register` and still sends `mobile`. If the response is not OK, it throws `ApiError` with FastAPI’s `detail` string, the HTTP status, per-field messages when `detail` is a list, and `(ref: …)` when the response includes `X-Request-ID`. The page catches that and shows `error.message` in red.
 
 ## The shell around every page
 
@@ -100,7 +104,7 @@ Checks, all in the browser before the request:
 
 | Field | Rule |
 | --- | --- |
-| Name | Required, at least 6 characters, letters and spaces only. |
+| Name | Required, at least 6 characters, letters only, with a single space between words. |
 | Email | Required, must look like an email. Uniqueness is checked by the API on submit. A duplicate is shown under this field as “This email is already registered.” |
 | Mobile | Exactly 10 digits. The week 4 form lists name, email, and password. This API refuses registration without a mobile number, so the field is here so an account can be created and an order can be placed. |
 | Password | At least 8 characters, one uppercase, one lowercase, one digit, one special character. |
@@ -129,7 +133,7 @@ The website does not show the role and has no admin screens. All three people us
 
 On load: `GET /api/categories` fills the dropdown, and `GET /api/products` fills the grid. The dropdown value is the category **name**, plus “All categories”. Any category row in the database appears here, including one that was created during earlier API testing. The four seeded names are Electronics, Clothing, Books, and Home and Kitchen.
 
-Search is live. The name box waits 300 ms after typing stops, and a slow older answer is ignored if a newer search has already been sent. There is no Search button. With both filters empty the call is `GET /api/products`. With either filter set it is `GET /api/products/search?name=&category=`. “No products found.” appears only after a successful response that returned an empty list. A failed request shows the error and does not also show “No products found.”
+Search is live. The name box waits 300 ms after typing stops, and a slow older answer is ignored if a newer search has already been sent. There is no Search button. Typed text matches a product name through `GET /api/products/search`, and also a category name, so “Books” still lists that category. The category dropdown filters by an exact category. With both filters empty the call is `GET /api/products`. “No products found.” appears only after a successful response that returned an empty list. A failed request shows the error and does not also show “No products found.”
 
 Each card shows the image, name, category, description, price as `INR` with no paise when the amount is a whole number, **In cart: N**, and a yellow **Add to Cart**. Add to Cart adds one. The image and the name are the link to `/products/{id}`. The button is outside that link, so adding does not open the details page. If `product_url` is empty, the card shows a gray “No image” box. If the URL is set but the picture host fails, the browser’s broken-image icon is what you see. There is no second fallback. The pictures in the seed are Unsplash URLs stored in `product_url`. The React code does not pick the photos itself. It renders whatever URL the API returns.
 
@@ -148,13 +152,13 @@ After a successful change the page reloads the cart and stays on `/products`. It
 
 ### Product details (`ProductDetailsPage.jsx`)
 
-`GET /api/products/{productId}` loads one product. A 404 is shown as “Product not found.” The cart context finds this product’s line. The page shows description (or “No description available.”), category (or “Uncategorised”), price, **SKU**, “N in stock”, **In cart**, a Qty box, and Add to Cart. Qty starts at 1 and is how many to add this time. It must be a positive whole number and cannot pass the stock still left. An invalid Qty shows the error and Add to Cart does not call the API. A valid add stays on `/products/{id}`. “Back to products” goes to `/products`. `ProductCard` checks its props with PropTypes.
+`GET /api/products/{productId}` loads one product. A 404 is shown as “Product not found.” The cart context finds this product’s line. The page shows description (or “No description available.”), category (or “Uncategorised”), price, **SKU**, “N in stock”, **In cart**, a Qty box, and Add to Cart. Qty starts at 1 and is how many to add this time. It must be a positive whole number, cannot pass the stock still left, and the line cannot go above 10 (`VITE_MAX_QUANTITY_PER_ITEM`, or 10 when that variable is unset). An invalid Qty shows the error and Add to Cart does not call the API. A valid add stays on `/products/{id}`. “Back to products” goes to `/products`. Components that take props, including `ProductCard`, check them with PropTypes.
 
 ### Cart (`CartPage.jsx`)
 
 Requires login. `GET /api/cart/{user_id}`.
 
-Each line shows name, unit price, subtotal, a Qty box, and a red **Remove**. Qty must be a positive whole number and cannot pass `available_quantity`. An empty box, zero, a decimal, or a number above stock shows the error under that line and is not sent. A valid change waits briefly, then `PUT /api/cart/update/{cart_item_id}` with that absolute quantity. **Remove** deletes the line. It is the way to take the quantity to zero.
+Each line shows name, unit price, subtotal, a Qty box, and a red **Remove**. Qty must be a positive whole number, cannot pass `available_quantity`, and cannot pass 10 per product. An empty box, zero, a decimal, a number above stock, or a number above 10 shows the error under that line and is not sent. A valid change waits 500 ms, then `PUT /api/cart/update/{cart_item_id}` with that absolute quantity. **Remove** deletes the line. It is the way to take the quantity to zero.
 
 **Items** is the sum of quantities. **Total** is the sum of `line_total`. Both are computed in the browser. The cart response has no total field, so the browser adds the lines. Checkout is blue and disabled when the cart is empty, and also when any line’s quantity is above `available_quantity`. That case shows “Not available in this quantity.” “Continue shopping” goes to `/products`. The same count is what the header Cart link shows.
 
@@ -164,10 +168,7 @@ Requires login. Loads the same cart. The only payment choices are **Credit Card*
 
 **Place order** posts `POST /api/orders/checkout` with `{ user_id, payment_method }`. The button says “Placing order...” and is disabled while busy, when the cart is empty, and when a line is above the stock left.
 
-What happens next depends on `order.payment_status` in the response:
-
-- `PAID`: the browser goes to `/orders/{order_id}`. That page is this order only, not the full history. The success text is not left on the checkout form.
-- Anything else: the person stays on checkout. The message is “Payment was not completed. {order number} is on hold in your orders.” The cart list on this screen is cleared. The API has already turned the cart into an order and removed those cart lines, including when payment did not succeed. Stock for a failed payment is released by the API. The order remains and can be paid from its details page.
+The browser then goes to `/orders/{order_id}` whether payment succeeded or failed. When `payment_status` is `PAID`, that page shows “Thank you! Your order has been placed.” A failed payment opens the same order page without that sentence. The cart is already cleared. Stock for a failed payment is released by the API. The order remains and can be paid from its details page.
 
 “View order history” still links to `/orders` if they want the full list instead.
 
@@ -175,23 +176,23 @@ What happens next depends on `order.payment_status` in the response:
 
 Requires login. `GET /api/orders/me`. These are only the logged-in user’s orders. An empty list shows the exact text “No orders found.”
 
-Each row shows order number, local date and time (`toLocaleString`, so it follows the laptop’s locale), total, and a status word. `PAID` is blue **Placed**. Any other payment status is red **On hold**. **View details** goes to `/orders/{order_id}`.
+Each row shows order number, local date and time (`toLocaleString`, so it follows the laptop’s locale), total, and status pills. A confirmed paid order shows **Confirmed** and **Paid**. A failed payment shows **Payment Failed**. Anything still waiting shows **Pending Payment**. **View details** goes to `/orders/{order_id}`.
 
 ### One order (`OrderDetailsPage.jsx`)
 
 Requires login. `GET /api/orders/details/{orderId}`.
 
-Heading is the order number, then Placed or On hold, the date, and a table of Product, Qty, Price, Subtotal. Qty here is text. A placed order’s quantities cannot be edited. Total is under the table. If the API sent `payment_reference`, it is shown. If the order is not paid and `failure_reason` is set, that sentence is shown. A 403 is “You can only view your own orders.” A 404 is “Order not found.” “Back to order history” goes to `/orders`.
+Heading is the order number, then the same status pills, the date, and a table of Product, Qty, Price, Subtotal. Qty here is text. A placed order’s quantities cannot be edited. Total is under the table. If checkout just succeeded, the page also shows “Thank you! Your order has been placed.” If the API sent `payment_reference`, it is shown. If the order is not paid and `failure_reason` is set, that sentence is shown. A 403 is “You can only view your own orders.” A 404 is “Order not found.” “Back to order history” goes to `/orders`.
 
-If `payment_status` is `FAILED`, a blue **Pay again** button calls `POST /api/payments/process` with `{ order_id }`. A paid order and an order that is only pending do not show it. On success the same page replaces its data, so a paid retry flips the label to Placed and the button goes away. On failure the order stays on screen and the error is shown under it. The button says “Trying payment...” while busy.
+If `payment_status` is `FAILED`, a blue **Pay again** button calls `POST /api/payments/process` with `{ order_id }`. A paid order and an order that is only pending do not show it. On success the same page replaces its data, so a paid retry shows **Paid** and the button goes away. On failure the order stays on screen and the error is shown under it. The button says “Trying payment...” while busy.
 
-This is the page checkout opens after a successful place.
+This is the page checkout opens after every place, paid or failed.
 
 ### Profile (`ProfilePage.jsx`)
 
 Requires login. The header name and icon are the way in. `GET /api/auth/me` supplies name, email, and phone. A 10-digit mobile is shown as `+91-` plus those digits. The `+91` is display only. The API stores 10 digits. Role is not shown.
 
-**Placed orders** is `GET /api/orders/me` filtered in the browser to `payment_status === "PAID"`. On-hold orders are not in this list. They remain on the Orders page. Each placed row shows number, date, “Credit Card” or “Cash on Delivery” (the API values `CARD` and `COD`), total, the word Placed, and View details. None yet says “No placed orders yet.”
+**Placed orders** is `GET /api/orders/me` filtered in the browser to `payment_status === "PAID"`. Failed and pending orders are not in this list. They remain on the Orders page. Each placed row shows number, date, “Credit Card” or “Cash on Delivery” (the API values `CARD` and `COD`), total, the **Confirmed** and **Paid** pills, and View details. None yet says “No placed orders yet.”
 
 ## One shopping path, in order
 
@@ -206,7 +207,7 @@ Use this as the live demo.
 7. You land on that order’s page, for example `/orders/6` with heading `ORD-000006`, and only that order’s lines.
 8. Orders in the menu is the full history. Profile is the person’s phone and only the placed orders.
 
-To show an on-hold order you need the fake payment API in fail mode. That is a backend switch, not a button in this website. After a failed checkout the message stays on the checkout page, the cart is empty, and the order appears under Orders as On hold. Pay again is on its details page only when `payment_status` is `FAILED`.
+To show a failed payment you need the fake payment API in fail mode. That is a backend switch, not a button in this website. After a failed checkout the browser opens that order. The cart is empty. The pill is **Payment Failed**. Pay again is on its details page only when `payment_status` is `FAILED`.
 
 ## What the week 4 brief maps to
 
@@ -233,8 +234,8 @@ These were added because you asked for them. They are not in the week 4 PDF. Mob
 | A real Home page, opened by default, reachable from the navbar | `/` and `/home` render `HomePage.jsx`. The site does not send you to `/products` on open. The header brand and both Home links go to `/home`. The page is four cards: Products, Cart, Orders, and Account. |
 | Profile with the customer’s phone and the orders they have placed | `/profile` shows name, email, and phone. A 10-digit mobile is displayed as `+91-` plus the digits. Role is not shown. The order list is only rows whose payment status is `PAID`. On-hold orders stay on the Orders page. |
 | Stay on the product after Add to Cart | Adding on the list stays on `/products`. On the details page it stays on `/products/{id}`. The cart opens only when you choose Cart or Checkout. |
-| After a successful place, open that order | If `payment_status` is `PAID`, checkout navigates to `/orders/{order_id}` for that order only. |
-| An order counts as placed only when payment succeeds | `PAID` is labeled **Placed**. Any other payment status is **On hold**. A failed checkout stays on the checkout page with “Payment was not completed. {order number} is on hold in your orders.” The API message was changed the same way. **Pay again** is shown only when `payment_status` is `FAILED`, and it calls `POST /api/payments/process`. |
+| After place, open that order | Checkout always navigates to `/orders/{order_id}`. When payment is `PAID`, the page shows “Thank you! Your order has been placed.” |
+| Status pills from this API’s fields | `CONFIRMED` is **Confirmed**, `PAID` is **Paid**, a waiting order is **Pending Payment**, and `PAYMENT_FAILED` or `FAILED` is **Payment Failed**. **Pay again** is shown only when `payment_status` is `FAILED`. |
 | Free product photos, with no copyright problem | Seed products use Unsplash image URLs in `product_url` (`app/db/seed.py`). The React code only displays the URL the API returns. |
 | Prices in INR, written as the letters INR, not the rupee sign | `utils/money.js` formats money as `INR 6599`. Whole amounts have no paise. |
 | Shop-style whole prices such as 5999 or 499 | `app/db/seed.py` stores whole rupee amounts ending in 99, the nearest such price to the old dollar amount times 83. Re-seeding writes those prices onto products that already exist. Orders placed before that change keep the totals saved at checkout. |
@@ -268,8 +269,8 @@ Kept from this app, because it matches this API or a choice you already made:
 | Kept | Why it was not replaced |
 | --- | --- |
 | Home, profile, photos, `INR` letters, out-of-stock cards last, **In cart: N** | These are extras you asked for. The other site does not have them. |
-| Typed Qty, with an error, and no cap of 10 | The PDF limits quantity by stock. A max of 10 is not in the PDF. |
-| **Placed** only when payment is `PAID`, otherwise **On hold**, and checkout stays put | You asked for that meaning of “order placed.” Pay again is only on an order whose `payment_status` is `FAILED`. `failure_reason` and `payment_reference` are shown when the API sends them. |
+| Typed Qty, with an error, and a cap of 10 | Stock still limits the line. `VITE_MAX_QUANTITY_PER_ITEM` adds a cap of 10 on top. The cart waits 500 ms before it saves a valid quantity. |
+| Status pills, and checkout always opens the order | **Confirmed**, **Paid**, **Pending Payment**, and **Payment Failed** replace Placed and On hold. A paid checkout shows “Thank you! Your order has been placed.” Pay again is only on an order whose `payment_status` is `FAILED`. `failure_reason` and `payment_reference` are shown when the API sends them. |
 | Red, blue, yellow, and white buttons, phone `+1 234 567 890`, copyright year 2026 | Your color rules and the week 4 picture. The brand text is now ABC Shop. |
 | Cart total added in the browser from `line_total` | This cart response has no total field. |
 | Admin and support can use the same shop screens | This API allows their carts. Hiding those pages would not match the server. |
@@ -323,7 +324,7 @@ Kept from this app, because it matches this API or a choice you already made:
 
 **Profile “placed” is stricter than the Orders page.** Orders shows on-hold rows. Profile keeps only `PAID`.
 
-**A failed payment still consumes the cart.** The order exists and is on hold. The items are not put back in the cart. Pay again is on that order’s page when the payment status is `FAILED`, not a new checkout of the same cart.
+**A failed payment still consumes the cart.** The order exists and its pill is **Payment Failed**. The items are not put back in the cart. Checkout opens that order. Pay again is on that page when the payment status is `FAILED`, not a new checkout of the same cart.
 
 **Checkout only redirects when payment status is `PAID`.** That is the meaning of “order placed” on this site.
 

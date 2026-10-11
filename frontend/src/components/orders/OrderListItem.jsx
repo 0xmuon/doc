@@ -2,6 +2,7 @@
 import PropTypes from "prop-types";
 import { Link } from "react-router-dom";
 import StatusBadge from "../common/StatusBadge";
+import { statusLabels } from "../../utils/statusLabels";
 import { inr } from "../../utils/money";
 
 export default function OrderListItem({ order, detail }) {
@@ -13,7 +14,11 @@ export default function OrderListItem({ order, detail }) {
           <p className="text-sm text-neutral-600">{new Date(order.order_date).toLocaleString()}</p>
           {detail ? <p className="text-sm">{detail}</p> : null}
           <p className="text-sm">Total {inr(order.total_amount)}</p>
-          <StatusBadge status={order.payment_status} />
+          <div className="mt-1 flex flex-wrap gap-2">
+            {statusLabels(order).map((label) => (
+              <StatusBadge key={label} status={label} />
+            ))}
+          </div>
         </div>
         <Link to={`/orders/${order.order_id}`} className="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
           View details
@@ -30,6 +35,7 @@ OrderListItem.propTypes = {
     order_date: PropTypes.string.isRequired,
     total_amount: PropTypes.number.isRequired,
     payment_status: PropTypes.string,
+    order_status: PropTypes.string,
   }).isRequired,
   detail: PropTypes.string,
 };

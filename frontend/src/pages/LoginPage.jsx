@@ -4,7 +4,7 @@
  */
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { safeReturnPath, useAuth } from "../context/AuthContext";
+import { safeReturnPath, useAuth } from "../context/auth-context";
 import { useForm } from "../hooks/useForm";
 import { validateEmail, validateLoginPassword } from "../utils/validate";
 

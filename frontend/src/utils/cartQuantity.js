@@ -1,26 +1,20 @@
-import { api } from "../api/client";
+import { addCartItem, removeCartItem, updateCartItem } from "../api/cartApi";
+import { MAX_QUANTITY_PER_ITEM } from "./validate";
 
 export async function setCartQuantity({ token, userId, productId, nextQuantity, available, line }) {
   if (nextQuantity > available) {
     throw new Error("Quantity cannot exceed available stock.");
   }
+  if (nextQuantity > MAX_QUANTITY_PER_ITEM) {
+    throw new Error(`At most ${MAX_QUANTITY_PER_ITEM} per product.`);
+  }
   if (nextQuantity < 1) {
-    if (line) {
-      await api(`/api/cart/remove/${line.cart_item_id}`, { method: "DELETE", token });
-    }
+    if (line) await removeCartItem(line.cart_item_id, token);
     return;
   }
   if (!line) {
-    await api("/api/cart/add", {
-      method: "POST",
-      token,
-      body: { user_id: userId, product_id: productId, quantity: nextQuantity },
-    });
+    await addCartItem({ token, userId, productId, quantity: nextQuantity });
     return;
   }
-  await api(`/api/cart/update/${line.cart_item_id}`, {
-    method: "PUT",
-    token,
-    body: { quantity: nextQuantity },
-  });
+  await updateCartItem(line.cart_item_id, nextQuantity, token);
 }

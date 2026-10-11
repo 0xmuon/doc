@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { api } from "../api/client";
+import { Link, useLocation, useParams } from "react-router-dom";
+import { fetchOrder, retryPayment } from "../api/orderApi";
 import StatusBadge from "../components/common/StatusBadge";
-import { useAuth } from "../context/AuthContext";
+import { statusLabels } from "../utils/statusLabels";
+import { useAuth } from "../context/auth-context";
 import { inr } from "../utils/money";
 
 export default function OrderDetailsPage() {
   const { orderId } = useParams();
+  const location = useLocation();
   const { token, ready } = useAuth();
   const [order, setOrder] = useState(null);
   const [error, setError] = useState("");
@@ -14,7 +16,7 @@ export default function OrderDetailsPage() {
 
   useEffect(() => {
     if (!ready || !token) return;
-    api(`/api/orders/details/${orderId}`, { token })
+    fetchOrder(orderId, token)
       .then(setOrder)
       .catch((err) => {
         if (err.status === 403) setError("You can only view your own orders.");
@@ -27,11 +29,7 @@ export default function OrderDetailsPage() {
     setBusy(true);
     setError("");
     try {
-      const updated = await api("/api/payments/process", {
-        method: "POST",
-        token,
-        body: { order_id: order.order_id },
-      });
+      const updated = await retryPayment(order.order_id, token);
       setOrder(updated);
     } catch (err) {
       setError(err.message);
@@ -47,7 +45,14 @@ export default function OrderDetailsPage() {
     <section>
       <Link to="/orders" className="text-sm underline">Back to order history</Link>
       <h1 className="mt-3 text-2xl font-semibold">{order.order_number}</h1>
-      <StatusBadge status={order.payment_status} />
+      {location.state?.justPlaced && order.payment_status !== "FAILED" ? (
+        <p className="mt-3 text-sm text-blue-800">Thank you! Your order has been placed.</p>
+      ) : null}
+      <div className="mt-2 flex flex-wrap gap-2">
+        {statusLabels(order).map((label) => (
+          <StatusBadge key={label} status={label} />
+        ))}
+      </div>
       <p className="text-sm text-neutral-600">{new Date(order.order_date).toLocaleString()}</p>
       {order.payment_reference ? <p className="text-sm text-neutral-600">Reference {order.payment_reference}</p> : null}
       {order.payment_status !== "PAID" && order.failure_reason ? (

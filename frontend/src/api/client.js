@@ -32,12 +32,20 @@ export function setTokensRefreshedHandler(handler) {
 }
 
 export class ApiError extends Error {
-  constructor(message, status, fieldErrors = {}) {
+  constructor(message, status, fieldErrors = {}, requestId = "") {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.fieldErrors = fieldErrors;
+    this.requestId = requestId;
   }
+}
+
+/** Server message, with the API request id when the response sent one. */
+export function errorText(error) {
+  if (!error) return "";
+  if (!error.requestId || String(error.message).includes(`ref: ${error.requestId}`)) return error.message || "";
+  return `${error.message} (ref: ${error.requestId})`;
 }
 
 function messageFrom(data, statusText) {
@@ -108,7 +116,9 @@ export async function api(path, { method = "GET", body, token } = {}, allowRefre
   }
   if (!response.ok) {
     const parsed = messageFrom(data, response.statusText);
-    throw new ApiError(parsed.message, response.status, parsed.fieldErrors);
+    const requestId = response.headers.get("X-Request-ID") || data?.request_id || "";
+    const message = requestId ? `${parsed.message} (ref: ${requestId})` : parsed.message;
+    throw new ApiError(message, response.status, parsed.fieldErrors, requestId);
   }
   return data;
 }

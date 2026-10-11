@@ -1,6 +1,6 @@
 /** Header: brand, menu, and the profile icon. */
 import { Link } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/auth-context";
 import Menu from "./Menu";
 
 function ProfileIcon() {

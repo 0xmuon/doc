@@ -1,6 +1,6 @@
 /** Top menu. Home, Products, Cart, and Orders. Cart shows how many items are in the cart. */
 import { NavLink, useLocation } from "react-router-dom";
-import { useCart } from "../../context/CartContext";
+import { useCart } from "../../context/cart-context";
 
 const linkClass = ({ isActive }) =>
   `text-sm ${isActive ? "font-semibold text-blue-700 underline" : "text-slate-700 hover:text-blue-700"}`;

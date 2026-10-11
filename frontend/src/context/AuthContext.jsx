@@ -2,10 +2,12 @@
  * Who is logged in. Access and refresh tokens stay in localStorage.
  * A 401 in the API client refreshes the access token, or ends the session if that fails.
  */
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { api, setSessionExpiredHandler, setTokensRefreshedHandler, tokenStore } from "../api/client";
+import { useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
+import { fetchCurrentUser, loginUser, registerUser } from "../api/authApi";
+import { setSessionExpiredHandler, setTokensRefreshedHandler, tokenStore } from "../api/client";
+import { AuthContext } from "./auth-context";
 
-const AuthContext = createContext(null);
 const STORAGE_KEY = "abcshop_session";
 
 function readSession() {
@@ -30,7 +32,7 @@ function writeSession(next) {
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(readSession);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(() => !readSession()?.token);
 
   useEffect(() => {
     setTokensRefreshedHandler((data) => {
@@ -49,12 +51,9 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const saved = readSession();
-    if (!saved?.token) {
-      setReady(true);
-      return;
-    }
+    if (!saved?.token) return;
     tokenStore.save({ access_token: saved.token, refresh_token: saved.refreshToken });
-    api("/api/auth/me", { token: saved.token })
+    fetchCurrentUser(saved.token)
       .then((user) => {
         const next = { ...saved, token: tokenStore.getAccess() || saved.token, user };
         writeSession(next);
@@ -73,16 +72,13 @@ export function AuthProvider({ children }) {
       token: session?.token ?? "",
       user: session?.user ?? null,
       async login(email, password) {
-        const data = await api("/api/auth/login", {
-          method: "POST",
-          body: { email, password },
-        });
+        const data = await loginUser({ email, password });
         const next = { token: data.access_token, refreshToken: data.refresh_token, user: data.user };
         writeSession(next);
         setSession(next);
       },
       async register(payload) {
-        await api("/api/users/register", { method: "POST", body: payload });
+        await registerUser(payload);
       },
       logout() {
         writeSession(null);
@@ -94,11 +90,6 @@ export function AuthProvider({ children }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
-  return useContext(AuthContext);
-}
-
-export function safeReturnPath(value) {
-  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/products";
-  return value;
-}
+AuthProvider.propTypes = {
+  children: PropTypes.node.isRequired,
+};

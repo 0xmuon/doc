@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api } from "../api/client";
-import { useAuth } from "../context/AuthContext";
-import { useCart } from "../context/CartContext";
+import { placeOrder as checkoutOrder } from "../api/orderApi";
+import { useAuth } from "../context/auth-context";
+import { useCart } from "../context/cart-context";
 import { inr } from "../utils/money";
 
 export default function CheckoutPage() {
@@ -11,7 +11,6 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const [method, setMethod] = useState("CARD");
   const [error, setError] = useState("");
-  const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
 
   async function placeOrder(event) {
@@ -20,20 +19,12 @@ export default function CheckoutPage() {
     setBusy(true);
     setError("");
     try {
-      const data = await api("/api/orders/checkout", {
-        method: "POST",
-        token,
-        body: { user_id: user.user_id, payment_method: method },
-      });
+      const data = await checkoutOrder({ token, userId: user.user_id, paymentMethod: method });
       await refreshCart().catch(() => setCart({ user_id: user.user_id, items: [] }));
-      if (data.order.payment_status === "PAID") {
-        navigate(`/orders/${data.order.order_id}`);
-        return;
-      }
-      setResult(data);
+      const paid = data.order.payment_status === "PAID";
+      navigate(`/orders/${data.order.order_id}`, { state: paid ? { justPlaced: true } : undefined });
     } catch (err) {
       setError(err.message);
-    } finally {
       setBusy(false);
     }
   }
@@ -44,7 +35,7 @@ export default function CheckoutPage() {
   return (
     <section className="mx-auto max-w-2xl">
       <h1 className="text-2xl font-semibold">Checkout</h1>
-      {cart.items.length === 0 && !result ? <p className="mt-4 text-sm">Your cart is empty.</p> : null}
+      {cart.items.length === 0 ? <p className="mt-4 text-sm">Your cart is empty.</p> : null}
       <ul className="mt-4 divide-y">
         {cart.items.map((item) => (
           <li key={item.cart_item_id} className="flex justify-between py-3 text-sm">
@@ -63,14 +54,7 @@ export default function CheckoutPage() {
           </select>
         </label>
         {overStock ? <p className="text-sm text-red-700">Not available in this quantity. Update or remove that line before placing the order.</p> : null}
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
-        {result ? (
-          <p className="text-sm">
-            {result.order.payment_status === "PAID"
-              ? `Order placed. ${result.order.order_number}.`
-              : `Payment was not completed. ${result.order.order_number} is on hold in your orders.`}
-          </p>
-        ) : null}
+        {error ? <p className="text-sm text-red-700">{error}</p> : null}
         <button
           type="submit"
           disabled={cart.items.length === 0 || overStock || busy}

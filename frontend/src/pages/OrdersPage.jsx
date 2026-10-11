@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { api } from "../api/client";
+import { fetchMyOrders } from "../api/orderApi";
 import OrderListItem from "../components/orders/OrderListItem";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/auth-context";
 
 export default function OrdersPage() {
   const { token, ready } = useAuth();
@@ -10,7 +10,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     if (!ready || !token) return;
-    api("/api/orders/me", { token })
+    fetchMyOrders(token)
       .then(setOrders)
       .catch((err) => setError(err.message));
   }, [ready, token]);

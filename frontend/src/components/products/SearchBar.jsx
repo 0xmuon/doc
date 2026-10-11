@@ -1,4 +1,6 @@
 /** Live search. The page waits 300 ms before it calls the API. */
+import PropTypes from "prop-types";
+
 export default function SearchBar({ value, onChange }) {
   return (
     <input
@@ -12,3 +14,8 @@ export default function SearchBar({ value, onChange }) {
     />
   );
 }
+
+SearchBar.propTypes = {
+  value: PropTypes.string.isRequired,
+  onChange: PropTypes.func.isRequired,
+};

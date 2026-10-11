@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import PropTypes from "prop-types";
 import { Link, useNavigate } from "react-router-dom";
-import { api } from "../api/client";
-import { useAuth } from "../context/AuthContext";
-import { useCart } from "../context/CartContext";
+import { removeCartItem, updateCartItem } from "../api/cartApi";
+import { useAuth } from "../context/auth-context";
+import { useCart } from "../context/cart-context";
 import { inr } from "../utils/money";
-import { validateQuantity } from "../utils/validate";
+import { MAX_QUANTITY_PER_ITEM, validateQuantity } from "../utils/validate";
 
 function CartQuantityInput({ item, disabled, onCommit }) {
   const [value, setValue] = useState(String(item.quantity));
@@ -27,7 +28,7 @@ function CartQuantityInput({ item, disabled, onCommit }) {
     setError(message);
     window.clearTimeout(timerRef.current);
     if (message || Number(next) === item.quantity) return;
-    timerRef.current = window.setTimeout(() => onCommit(item, Number(next)), 400);
+    timerRef.current = window.setTimeout(() => onCommit(item, Number(next)), 500);
   }
 
   return (
@@ -38,7 +39,7 @@ function CartQuantityInput({ item, disabled, onCommit }) {
           ref={inputRef}
           type="number"
           min="1"
-          max={item.available_quantity}
+          max={Math.min(item.available_quantity, MAX_QUANTITY_PER_ITEM)}
           value={value}
           onChange={handleChange}
           disabled={disabled}
@@ -50,6 +51,16 @@ function CartQuantityInput({ item, disabled, onCommit }) {
     </div>
   );
 }
+
+CartQuantityInput.propTypes = {
+  item: PropTypes.shape({
+    quantity: PropTypes.number.isRequired,
+    available_quantity: PropTypes.number.isRequired,
+    product_name: PropTypes.string.isRequired,
+  }).isRequired,
+  disabled: PropTypes.bool,
+  onCommit: PropTypes.func.isRequired,
+};
 
 export default function CartPage() {
   const { token } = useAuth();
@@ -68,13 +79,9 @@ export default function CartPage() {
     setPendingId(item.cart_item_id);
     try {
       if (nextQuantity < 1) {
-        await api(`/api/cart/remove/${item.cart_item_id}`, { method: "DELETE", token });
+        await removeCartItem(item.cart_item_id, token);
       } else {
-        await api(`/api/cart/update/${item.cart_item_id}`, {
-          method: "PUT",
-          token,
-          body: { quantity: nextQuantity },
-        });
+        await updateCartItem(item.cart_item_id, nextQuantity, token);
       }
       await refreshCart();
     } catch (err) {

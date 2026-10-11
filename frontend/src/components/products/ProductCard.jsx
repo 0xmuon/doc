@@ -2,6 +2,7 @@
 import PropTypes from "prop-types";
 import { Link } from "react-router-dom";
 import { inr } from "../../utils/money";
+import { MAX_QUANTITY_PER_ITEM } from "../../utils/validate";
 
 export default function ProductCard({ product, cartQuantity, onChange, busy, message }) {
   const inStock = product.available_quantity > 0;
@@ -25,7 +26,7 @@ export default function ProductCard({ product, cartQuantity, onChange, busy, mes
           type="button"
           className="mt-3 w-fit rounded bg-yellow-400 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-yellow-300 disabled:opacity-50"
           onClick={() => onChange(product, quantity + 1)}
-          disabled={busy || quantity >= product.available_quantity}
+          disabled={busy || quantity >= product.available_quantity || quantity >= MAX_QUANTITY_PER_ITEM}
         >
           {busy ? "Updating..." : "Add to Cart"}
         </button>

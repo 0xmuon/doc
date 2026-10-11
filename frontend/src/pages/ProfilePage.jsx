@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../api/client";
+import { fetchCurrentUser } from "../api/authApi";
+import { fetchMyOrders } from "../api/orderApi";
 import OrderListItem from "../components/orders/OrderListItem";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/auth-context";
 
 const PAYMENT_LABEL = {
   CARD: "Credit Card",
@@ -28,7 +29,7 @@ export default function ProfilePage() {
       navigate("/login");
       return;
     }
-    Promise.all([api("/api/auth/me", { token }), api("/api/orders/me", { token })])
+    Promise.all([fetchCurrentUser(token), fetchMyOrders(token)])
       .then(([me, history]) => {
         setProfile(me);
         setOrders(history.filter((order) => order.payment_status === "PAID"));
