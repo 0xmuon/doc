@@ -17,6 +17,20 @@ coverage.xml
 # Local databases
 *.db
 
+# Frontend install and build. frontend/.gitignore lists these too.
+frontend/node_modules/
+frontend/dist/
+
 # Editors / OS
 .idea/
 .DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local reference copies and scratch renders. Not part of the app.
+ecommerce2.zip
+week2.pdf
+week3.pdf
+_imgcheck/
+_week2_pages/
+_week4_pages/
