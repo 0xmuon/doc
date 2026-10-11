@@ -26,7 +26,7 @@ export default function HomePage() {
     <section>
       <h1 className="text-2xl font-semibold">Home</h1>
       <p className="mt-3 max-w-2xl text-slate-700">
-        SwiftShop is the online shop. Look through products, add what you need to the cart, and check out.
+        ABC Shop is the online shop. Look through products, add what you need to the cart, and check out.
       </p>
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         {areas.map((area) => (

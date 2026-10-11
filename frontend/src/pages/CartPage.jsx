@@ -1,38 +1,69 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import { api } from "../services/api";
+import { useCart } from "../context/CartContext";
 import { inr } from "../utils/money";
+import { validateQuantity } from "../utils/validate";
+
+function CartQuantityInput({ item, disabled, onCommit }) {
+  const [value, setValue] = useState(String(item.quantity));
+  const [error, setError] = useState("");
+  const inputRef = useRef(null);
+  const timerRef = useRef(0);
+
+  useEffect(() => {
+    if (document.activeElement === inputRef.current) return;
+    setValue(String(item.quantity));
+    setError("");
+  }, [item.quantity]);
+
+  useEffect(() => () => window.clearTimeout(timerRef.current), []);
+
+  function handleChange(event) {
+    const next = event.target.value;
+    setValue(next);
+    const message = validateQuantity(next, item.available_quantity);
+    setError(message);
+    window.clearTimeout(timerRef.current);
+    if (message || Number(next) === item.quantity) return;
+    timerRef.current = window.setTimeout(() => onCommit(item, Number(next)), 400);
+  }
+
+  return (
+    <div>
+      <label className="text-sm">
+        Qty
+        <input
+          ref={inputRef}
+          type="number"
+          min="1"
+          max={item.available_quantity}
+          value={value}
+          onChange={handleChange}
+          disabled={disabled}
+          aria-label={`Quantity of ${item.product_name}`}
+          className="ml-2 w-20 rounded border px-2 py-1"
+        />
+      </label>
+      {error ? <p className="mt-1 text-sm text-red-700">{error}</p> : null}
+    </div>
+  );
+}
 
 export default function CartPage() {
-  const { token, user, ready } = useAuth();
+  const { token } = useAuth();
+  const { cart, refreshCart, overStock } = useCart();
   const navigate = useNavigate();
-  const [cart, setCart] = useState(null);
-  const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
   const [pendingId, setPendingId] = useState(0);
   const pendingRef = useRef(0);
 
-  useEffect(() => {
-    if (!ready) return;
-    if (!token) {
-      navigate("/login");
-      return;
-    }
-    api(`/api/cart/${user.user_id}`, { token })
-      .then(setCart)
-      .catch((err) => setServerError(err.message));
-  }, [ready, token, user, navigate]);
-
   async function changeQuantity(item, nextQuantity) {
     if (pendingRef.current) return;
+    const message = nextQuantity < 1 ? "" : validateQuantity(nextQuantity, item.available_quantity);
+    if (message) return;
     pendingRef.current = item.cart_item_id;
-    if (nextQuantity > item.available_quantity) {
-      pendingRef.current = 0;
-      setErrors((current) => ({ ...current, [item.cart_item_id]: "Quantity cannot exceed available stock." }));
-      return;
-    }
-    setErrors((current) => ({ ...current, [item.cart_item_id]: "" }));
     setServerError("");
     setPendingId(item.cart_item_id);
     try {
@@ -45,7 +76,7 @@ export default function CartPage() {
           body: { quantity: nextQuantity },
         });
       }
-      setCart(await api(`/api/cart/${user.user_id}`, { token }));
+      await refreshCart();
     } catch (err) {
       setServerError(err.message);
     } finally {
@@ -75,33 +106,16 @@ export default function CartPage() {
               <p className="text-sm text-neutral-600">Price {inr(item.unit_price)}</p>
               <p className="text-sm">Subtotal {inr(item.line_total)}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center rounded border border-slate-300 bg-white">
-                <button
-                  type="button"
-                  aria-label={`Decrease quantity of ${item.product_name}`}
-                  className="px-3 py-1 text-lg leading-none text-slate-800 hover:bg-slate-50 disabled:opacity-50"
-                  onClick={() => changeQuantity(item, item.quantity - 1)}
-                  disabled={pendingId === item.cart_item_id}
-                >
-                  −
-                </button>
-                <span className="min-w-8 text-center text-sm" aria-live="polite">{item.quantity}</span>
-                <button
-                  type="button"
-                  aria-label={`Increase quantity of ${item.product_name}`}
-                  className="px-3 py-1 text-lg leading-none text-slate-800 hover:bg-slate-50 disabled:opacity-50"
-                  onClick={() => changeQuantity(item, item.quantity + 1)}
-                  disabled={pendingId === item.cart_item_id || item.quantity >= item.available_quantity}
-                >
-                  +
-                </button>
-              </div>
-              <button type="button" className="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700 disabled:opacity-50" onClick={() => removeItem(item)} disabled={pendingId === item.cart_item_id}>
+            <div className="flex items-start gap-2">
+              <CartQuantityInput
+                item={item}
+                disabled={pendingId === item.cart_item_id}
+                onCommit={changeQuantity}
+              />
+              <button type="button" className="mt-5 rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700 disabled:opacity-50" onClick={() => removeItem(item)} disabled={pendingId === item.cart_item_id}>
                 Remove
               </button>
             </div>
-            {errors[item.cart_item_id] ? <p className="text-sm text-red-700">{errors[item.cart_item_id]}</p> : null}
           </li>
         ))}
       </ul>
@@ -109,9 +123,10 @@ export default function CartPage() {
         <p>Items: {itemCount}</p>
         <p className="font-semibold">Total: {inr(total)}</p>
       </div>
+      {overStock ? <p className="mt-4 text-sm text-red-700">Not available in this quantity. Update or remove that line to check out.</p> : null}
       <button
         type="button"
-        disabled={cart.items.length === 0}
+        disabled={cart.items.length === 0 || overStock}
         onClick={() => navigate("/checkout")}
         className="mt-4 rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
       >

@@ -1,32 +1,22 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import { api } from "../services/api";
+import { useCart } from "../context/CartContext";
 import { inr } from "../utils/money";
 
 export default function CheckoutPage() {
-  const { token, user, ready } = useAuth();
+  const { token, user } = useAuth();
+  const { cart, overStock, setCart, refreshCart } = useCart();
   const navigate = useNavigate();
-  const [cart, setCart] = useState(null);
   const [method, setMethod] = useState("CARD");
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (!ready) return;
-    if (!token) {
-      navigate("/login");
-      return;
-    }
-    api(`/api/cart/${user.user_id}`, { token })
-      .then(setCart)
-      .catch((err) => setError(err.message));
-  }, [ready, token, user, navigate]);
-
   async function placeOrder(event) {
     event.preventDefault();
-    if (!cart?.items.length || busy) return;
+    if (!cart?.items.length || overStock || busy) return;
     setBusy(true);
     setError("");
     try {
@@ -35,12 +25,12 @@ export default function CheckoutPage() {
         token,
         body: { user_id: user.user_id, payment_method: method },
       });
+      await refreshCart().catch(() => setCart({ user_id: user.user_id, items: [] }));
       if (data.order.payment_status === "PAID") {
         navigate(`/orders/${data.order.order_id}`);
         return;
       }
       setResult(data);
-      setCart({ user_id: user.user_id, items: [] });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -72,7 +62,8 @@ export default function CheckoutPage() {
             <option value="COD">Cash on Delivery</option>
           </select>
         </label>
-        {error ? <p className="text-sm text-red-700">{error}</p> : null}
+        {overStock ? <p className="text-sm text-red-700">Not available in this quantity. Update or remove that line before placing the order.</p> : null}
+      {error ? <p className="text-sm text-red-700">{error}</p> : null}
         {result ? (
           <p className="text-sm">
             {result.order.payment_status === "PAID"
@@ -82,7 +73,7 @@ export default function CheckoutPage() {
         ) : null}
         <button
           type="submit"
-          disabled={cart.items.length === 0 || busy}
+          disabled={cart.items.length === 0 || overStock || busy}
           className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
         >
           {busy ? "Placing order..." : "Place order"}

@@ -1,45 +1,58 @@
+/**
+ * One product. Qty is how many to add. An invalid number is shown and is not sent.
+ * The page stays here after a successful add.
+ */
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import QuantityStepper from "../components/QuantityStepper";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import { api } from "../services/api";
+import { useCart } from "../context/CartContext";
 import { setCartQuantity } from "../utils/cartQuantity";
 import { inr } from "../utils/money";
+import { validateQuantity } from "../utils/validate";
 
 export default function ProductDetailsPage() {
   const { productId } = useParams();
-  const { token, user, ready } = useAuth();
+  const { token, user } = useAuth();
+  const { items, refreshCart } = useCart();
   const navigate = useNavigate();
+  const location = useLocation();
   const [product, setProduct] = useState(null);
-  const [cartLine, setCartLine] = useState(null);
+  const [quantity, setQuantity] = useState("1");
+  const [quantityError, setQuantityError] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const pendingRef = useRef(false);
+  const cartLine = items.find((item) => item.product_id === Number(productId)) || null;
 
   useEffect(() => {
+    let ignore = false;
+    setProduct(null);
+    setError("");
     api(`/api/products/${productId}`)
-      .then(setProduct)
-      .catch((err) => setError(err.message));
+      .then((row) => {
+        if (!ignore) setProduct(row);
+      })
+      .catch((err) => {
+        if (ignore) return;
+        setError(err.status === 404 ? "Product not found." : err.message);
+      });
+    return () => {
+      ignore = true;
+    };
   }, [productId]);
 
-  useEffect(() => {
-    if (!ready) return;
-    if (!token || !user) {
-      setCartLine(null);
-      return;
-    }
-    api(`/api/cart/${user.user_id}`, { token })
-      .then((data) => setCartLine(data.items.find((item) => item.product_id === Number(productId)) || null))
-      .catch((err) => setError(err.message));
-  }, [ready, token, user, productId]);
-
-  async function changeQuantity(nextQuantity) {
-    if (!token || !user) {
-      navigate("/login");
-      return;
-    }
+  async function addToCart() {
     if (pendingRef.current || !product) return;
-    if ((cartLine?.quantity ?? 0) === nextQuantity) return;
+    const inCart = cartLine?.quantity || 0;
+    const room = product.available_quantity - inCart;
+    const message = validateQuantity(quantity, room);
+    setQuantityError(message);
+    if (message) return;
+    if (!token || !user) {
+      navigate("/login", { state: { from: location.pathname, message: "Please log in to add items to your cart." } });
+      return;
+    }
     pendingRef.current = true;
     setBusy(true);
     setError("");
@@ -48,12 +61,12 @@ export default function ProductDetailsPage() {
         token,
         userId: user.user_id,
         productId: product.product_id,
-        nextQuantity,
+        nextQuantity: inCart + Number(quantity),
         available: product.available_quantity,
         line: cartLine,
       });
-      const data = await api(`/api/cart/${user.user_id}`, { token });
-      setCartLine(data.items.find((item) => item.product_id === product.product_id) || null);
+      await refreshCart();
+      setQuantity("1");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -62,7 +75,14 @@ export default function ProductDetailsPage() {
     }
   }
 
-  if (error && !product) return <p className="text-sm text-red-700">{error}</p>;
+  if (error && !product) {
+    return (
+      <section>
+        <p className="text-sm text-red-700">{error}</p>
+        <Link to="/products" className="mt-3 inline-block text-sm underline">Back to products</Link>
+      </section>
+    );
+  }
   if (!product) return <p className="text-sm">Loading product...</p>;
   const inStock = product.available_quantity > 0;
 
@@ -70,35 +90,45 @@ export default function ProductDetailsPage() {
     <article className="mx-auto max-w-2xl">
       <Link to="/products" className="text-sm underline">Back to products</Link>
       <h1 className="mt-3 text-2xl font-semibold">{product.product_name}</h1>
-      <p className="text-sm text-neutral-500">{product.category_name}</p>
+      <p className="text-sm text-neutral-500">{product.category_name || "Uncategorised"}</p>
       {product.product_url ? (
         <img src={product.product_url} alt={product.product_name} className="mt-4 h-64 w-full object-contain" />
       ) : null}
-      <p className="mt-4">{product.description}</p>
+      <p className="mt-4">{product.description || "No description available."}</p>
       <p className="mt-2 font-medium">{inr(product.price)}</p>
-      <p className="text-sm text-neutral-600">Available: {product.available_quantity}</p>
+      <p className="text-sm text-neutral-600">SKU {product.sku}</p>
+      <p className="text-sm text-neutral-600">{inStock ? `${product.available_quantity} in stock` : "Out of Stock"}</p>
       <p className="mt-1 text-sm text-slate-700">In cart: {cartLine?.quantity || 0}</p>
       {inStock ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <QuantityStepper
-            name={product.product_name}
-            quantity={cartLine?.quantity || 0}
-            max={product.available_quantity}
-            busy={busy}
-            onChange={changeQuantity}
-          />
+        <div className="mt-4 flex flex-wrap items-end gap-2">
+          <label className="text-sm">
+            Qty
+            <input
+              type="number"
+              min="1"
+              value={quantity}
+              onChange={(event) => {
+                setQuantity(event.target.value);
+                setQuantityError("");
+              }}
+              aria-label="Quantity"
+              disabled={busy}
+              className="mt-1 block w-20 rounded border px-2 py-2"
+            />
+          </label>
           <button
             type="button"
             disabled={busy || (cartLine?.quantity || 0) >= product.available_quantity}
-            onClick={() => changeQuantity((cartLine?.quantity || 0) + 1)}
+            onClick={addToCart}
             className="rounded bg-yellow-400 px-4 py-2 font-medium text-slate-900 hover:bg-yellow-300 disabled:opacity-50"
           >
-            {busy ? "Updating..." : "Add to Cart"}
+            {busy ? "Adding..." : "Add to Cart"}
           </button>
         </div>
       ) : (
         <p className="mt-4 font-medium text-red-700">Out of Stock</p>
       )}
+      {quantityError ? <p className="mt-2 text-sm text-red-700">{quantityError}</p> : null}
       {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
     </article>
   );

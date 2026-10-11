@@ -1,4 +1,4 @@
-import { api } from "../services/api";
+import { api } from "../api/client";
 
 export async function setCartQuantity({ token, userId, productId, nextQuantity, available, line }) {
   if (nextQuantity > available) {

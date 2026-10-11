@@ -1,23 +1,32 @@
+/**
+ * Product list. Search waits 300 ms, and a slow older answer cannot replace a newer one.
+ * Out-of-stock products stay at the end.
+ */
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import ProductCard from "../components/ProductCard";
+import { useLocation, useNavigate } from "react-router-dom";
+import SearchBar from "../components/products/SearchBar";
+import ProductCard from "../components/products/ProductCard";
+import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import { api } from "../services/api";
+import { useCart } from "../context/CartContext";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { setCartQuantity } from "../utils/cartQuantity";
 
 export default function ProductsPage() {
-  const { token, user, ready } = useAuth();
+  const { token, user } = useAuth();
+  const { items, refreshCart } = useCart();
   const navigate = useNavigate();
+  const location = useLocation();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
-  const [cartItems, setCartItems] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [pendingId, setPendingId] = useState(0);
   const [stockError, setStockError] = useState({ id: 0, message: "" });
   const pendingRef = useRef(0);
+  const debouncedName = useDebouncedValue(name.trim(), 300);
 
   useEffect(() => {
     api("/api/categories")
@@ -27,40 +36,38 @@ export default function ProductsPage() {
 
   useEffect(() => {
     const params = new URLSearchParams();
-    if (name.trim()) params.set("name", name.trim());
+    if (debouncedName) params.set("name", debouncedName);
     if (category) params.set("category", category);
     const path = params.size ? `/api/products/search?${params}` : "/api/products";
+    let ignore = false;
     setLoaded(false);
     api(path)
       .then((rows) => {
+        if (ignore) return;
         const ordered = [...rows].sort(
           (a, b) => Number(a.available_quantity <= 0) - Number(b.available_quantity <= 0),
         );
         setProducts(ordered);
         setError("");
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoaded(true));
-  }, [name, category]);
-
-  useEffect(() => {
-    if (!ready) return;
-    if (!token || !user) {
-      setCartItems([]);
-      return;
-    }
-    api(`/api/cart/${user.user_id}`, { token })
-      .then((data) => setCartItems(data.items))
-      .catch((err) => setError(err.message));
-  }, [ready, token, user]);
+      .catch((err) => {
+        if (!ignore) setError(err.message);
+      })
+      .finally(() => {
+        if (!ignore) setLoaded(true);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [debouncedName, category]);
 
   async function changeQuantity(product, nextQuantity) {
     if (!token || !user) {
-      navigate("/login");
+      navigate("/login", { state: { from: location.pathname, message: "Please log in to add items to your cart." } });
       return;
     }
     if (pendingRef.current) return;
-    const line = cartItems.find((item) => item.product_id === product.product_id) || null;
+    const line = items.find((item) => item.product_id === product.product_id) || null;
     if ((line?.quantity ?? 0) === nextQuantity) return;
     pendingRef.current = product.product_id;
     setPendingId(product.product_id);
@@ -74,8 +81,7 @@ export default function ProductsPage() {
         available: product.available_quantity,
         line,
       });
-      const data = await api(`/api/cart/${user.user_id}`, { token });
-      setCartItems(data.items);
+      await refreshCart();
     } catch (err) {
       setStockError({ id: product.product_id, message: err.message });
     } finally {
@@ -88,13 +94,7 @@ export default function ProductsPage() {
     <section>
       <h1 className="text-2xl font-semibold">Products</h1>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-        <input
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Search by name"
-          className="w-full rounded border px-3 py-2"
-          aria-label="Search by name"
-        />
+        <SearchBar value={name} onChange={setName} />
         <select
           value={category}
           onChange={(event) => setCategory(event.target.value)}
@@ -117,7 +117,7 @@ export default function ProductsPage() {
           <ProductCard
             key={product.product_id}
             product={product}
-            cartQuantity={cartItems.find((item) => item.product_id === product.product_id)?.quantity || 0}
+            cartQuantity={items.find((item) => item.product_id === product.product_id)?.quantity || 0}
             onChange={changeQuantity}
             busy={pendingId === product.product_id}
             message={stockError.id === product.product_id ? stockError.message : ""}

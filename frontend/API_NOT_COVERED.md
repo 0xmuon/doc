@@ -20,7 +20,7 @@ These routes are the ones the screens use, so a customer can register, browse, f
 | POST | `/api/orders/checkout` | Checkout. Payment method is `CARD` (Credit Card) or `COD` (Cash on Delivery) |
 | GET | `/api/orders/me` | Order history, and placed orders on the profile page |
 | GET | `/api/orders/details/{order_id}` | Order details |
-| POST | `/api/payments/process` | Pay again on an order that is on hold |
+| POST | `/api/payments/process` | Pay again, only when `payment_status` is `FAILED` |
 
 The cart total and item count are added up in the browser from the cart lines. The API has no cart-summary route.
 
@@ -33,7 +33,7 @@ These exist on port 8000 and are not called by any screen:
 | Method | Path | Why it is unused |
 | --- | --- | --- |
 | POST | `/api/users/login` | Login uses `/api/auth/login` instead. Same check. |
-| POST | `/api/auth/refresh` | The screen keeps the access token only. |
+| POST | `/api/auth/refresh` | Not a screen. `api/client.js` calls it once after a 401 and retries the original request. |
 | POST | `/api/auth/token` | Hidden Swagger login. The screen does not use it. |
 | GET | `/health` | Process check. Not a shop screen. |
 | GET | `/health/db` | Database check. Not a shop screen. |

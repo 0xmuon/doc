@@ -33,3 +33,11 @@ export function validateLoginPassword(password) {
   if (!password) return "Password is required.";
   return "";
 }
+
+export function validateQuantity(value, stock) {
+  const text = String(value).trim();
+  if (!text) return "Quantity is required.";
+  if (!/^\d+$/.test(text) || Number(text) < 1) return "Quantity must be a positive whole number.";
+  if (Number(text) > stock) return "Quantity cannot exceed available stock.";
+  return "";
+}

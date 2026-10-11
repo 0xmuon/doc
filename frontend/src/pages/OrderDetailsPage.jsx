@@ -1,27 +1,27 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
+import { api } from "../api/client";
+import StatusBadge from "../components/common/StatusBadge";
 import { useAuth } from "../context/AuthContext";
-import { api } from "../services/api";
 import { inr } from "../utils/money";
 
 export default function OrderDetailsPage() {
   const { orderId } = useParams();
   const { token, ready } = useAuth();
-  const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!ready) return;
-    if (!token) {
-      navigate("/login");
-      return;
-    }
+    if (!ready || !token) return;
     api(`/api/orders/details/${orderId}`, { token })
       .then(setOrder)
-      .catch((err) => setError(err.message));
-  }, [ready, token, orderId, navigate]);
+      .catch((err) => {
+        if (err.status === 403) setError("You can only view your own orders.");
+        else if (err.status === 404) setError("Order not found.");
+        else setError(err.message);
+      });
+  }, [ready, token, orderId]);
 
   async function payAgain() {
     setBusy(true);
@@ -47,10 +47,12 @@ export default function OrderDetailsPage() {
     <section>
       <Link to="/orders" className="text-sm underline">Back to order history</Link>
       <h1 className="mt-3 text-2xl font-semibold">{order.order_number}</h1>
-      <p className={`text-sm font-medium ${order.payment_status === "PAID" ? "text-blue-700" : "text-red-700"}`}>
-        {order.payment_status === "PAID" ? "Placed" : "On hold"}
-      </p>
+      <StatusBadge status={order.payment_status} />
       <p className="text-sm text-neutral-600">{new Date(order.order_date).toLocaleString()}</p>
+      {order.payment_reference ? <p className="text-sm text-neutral-600">Reference {order.payment_reference}</p> : null}
+      {order.payment_status !== "PAID" && order.failure_reason ? (
+        <p className="mt-2 text-sm text-red-700">Payment failed: {order.failure_reason}</p>
+      ) : null}
       <table className="mt-4 w-full text-left text-sm">
         <thead>
           <tr className="border-b">
@@ -72,7 +74,7 @@ export default function OrderDetailsPage() {
         </tbody>
       </table>
       <p className="mt-4 font-semibold">Total {inr(order.total_amount)}</p>
-      {order.payment_status !== "PAID" ? (
+      {order.payment_status === "FAILED" ? (
         <button type="button" disabled={busy} onClick={payAgain} className="mt-4 rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50">
           {busy ? "Trying payment..." : "Pay again"}
         </button>
