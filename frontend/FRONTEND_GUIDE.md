@@ -12,7 +12,7 @@ The brand on screen is **ABC Shop**. The week 4 brief is the source of the scree
 
 The browser never calls port 9000. That port is the fake payment and email service. The API on port 8000 calls it during checkout. If you are asked “does the React app talk to the payment service?”, the answer is no.
 
-`npm run build` produces a static `frontend/dist` folder. `npm run lint` runs oxlint. `npm test` runs Vitest on `utils/validate.test.js` (name, email, and quantity rules). There is no browser test suite.
+`npm run build` produces a static `frontend/dist` folder. `npm run lint` runs ESLint. `npm test` runs Vitest on `utils/validate.test.js` (name, email, and quantity rules). There is no browser test suite.
 
 ## What the project is made of
 
