@@ -138,7 +138,7 @@ def _apply_payment(db: Session, order_id: int, outcome: PaymentOutcome) -> Check
     db.commit()
     log_event("payment_result", order_id=order_id, payment_status=outcome.status, detail=outcome.detail)
     saved = order_repository.get_by_id(db, order_id)
-    message = "Order placed successfully" if outcome.status == PAID else "Order placed but payment failed"
+    message = "Order placed successfully" if outcome.status == PAID else "Payment was not completed. The order is on hold until payment succeeds."
     return CheckoutResponse(message=message, order=_to_order_response(saved))
 
 

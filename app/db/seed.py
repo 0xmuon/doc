@@ -7,17 +7,21 @@ from app.db import SessionLocal
 
 CATEGORIES = ["Electronics", "Clothing", "Books", "Home and Kitchen"]
 
+# Unsplash License photos: free to use, including commercially, with no attribution required.
+# https://unsplash.com/license
+_U = "https://images.unsplash.com/{}?auto=format&fit=crop&w=800&q=80"
 PRODUCTS = [
-    ("ELEC-001", "Wireless Headphones", "Over-ear Bluetooth headphones with noise cancellation", "Electronics", "79.99", "25", ""),
-    ("ELEC-002", "Smartphone Stand", "Adjustable aluminum stand for smartphones", "Electronics", "18.50", "40", ""),
-    ("CLOT-001", "Cotton T-Shirt", "Soft, breathable cotton crew-neck T-shirt", "Clothing", "14.99", "60", ""),
-    ("CLOT-002", "Running Shoes", "Lightweight athletic shoes for everyday running", "Clothing", "64.95", "30", ""),
-    ("BOOK-001", "Python Programming Guide", "Beginner-friendly guide to Python programming", "Books", "29.99", "20", ""),
-    ("BOOK-002", "Mystery Novel", "A suspenseful mystery novel with an unexpected ending", "Books", "12.50", "35", ""),
-    ("HOME-001", "Ceramic Coffee Mug", "Durable ceramic mug with a comfortable handle", "Home and Kitchen", "9.99", "50", ""),
-    ("HOME-002", "Nonstick Frying Pan", "Durable nonstick pan for everyday cooking", "Home and Kitchen", "34.99", "15", ""),
-    ("HOME-003", "LED Desk Lamp", "Adjustable LED lamp with three brightness levels", "Home and Kitchen", "24.75", "28", ""),
-    ("ELEC-003", "Portable Power Bank", "Compact power bank with USB-C fast charging", "Electronics", "32.00", "22", ""),
+    # Prices are whole INR amounts, the nearest shop price (ends in 99) to the old dollar price × 83.
+    ("ELEC-001", "Wireless Headphones", "Over-ear Bluetooth headphones with noise cancellation", "Electronics", "6599", "25", _U.format("photo-1505740420928-5e560c06d30e")),
+    ("ELEC-002", "Smartphone Stand", "Adjustable aluminum stand for smartphones", "Electronics", "1499", "40", _U.format("photo-1698314440355-eaf5ff14899c")),
+    ("CLOT-001", "Cotton T-Shirt", "Soft, breathable cotton crew-neck T-shirt", "Clothing", "1199", "60", _U.format("photo-1521572163474-6864f9cf17ab")),
+    ("CLOT-002", "Running Shoes", "Lightweight athletic shoes for everyday running", "Clothing", "5399", "30", _U.format("photo-1637437757614-6491c8e915b5")),
+    ("BOOK-001", "Python Programming Guide", "Beginner-friendly guide to Python programming", "Books", "2499", "20", _U.format("photo-1515879218367-8466d910aaa4")),
+    ("BOOK-002", "Mystery Novel", "A suspenseful mystery novel with an unexpected ending", "Books", "999", "35", _U.format("photo-1495446815901-a7297e633e8d")),
+    ("HOME-001", "Ceramic Coffee Mug", "Durable ceramic mug with a comfortable handle", "Home and Kitchen", "799", "50", _U.format("photo-1514228742587-6b1558fcca3d")),
+    ("HOME-002", "Nonstick Frying Pan", "Durable nonstick pan for everyday cooking", "Home and Kitchen", "2899", "15", _U.format("photo-1592156328697-079f6ee0cfa5")),
+    ("HOME-003", "LED Desk Lamp", "Adjustable LED lamp with three brightness levels", "Home and Kitchen", "2099", "28", _U.format("photo-1682827923239-9517e6d445a5")),
+    ("ELEC-003", "Portable Power Bank", "Compact power bank with USB-C fast charging", "Electronics", "2699", "22", _U.format("photo-1609091839311-d5365f9ff1c5")),
 ]
 
 
@@ -38,9 +42,13 @@ def seed_database() -> None:
                 db.flush()
             categories[name] = category
         for sku, name, description, category_name, price, quantity, url in PRODUCTS:
-            if product_repository.get_by_sku(db, sku) is not None:
-                continue
-            if product_repository.get_by_name(db, name) is not None:
+            existing = product_repository.get_by_sku(db, sku)
+            if existing is None:
+                existing = product_repository.get_by_name(db, name)
+            if existing is not None:
+                existing.price = Decimal(price)
+                if url and not (existing.product_url or "").strip():
+                    existing.product_url = url
                 continue
             db.add(
                 Product(

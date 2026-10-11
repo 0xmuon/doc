@@ -26,8 +26,9 @@ def configure_logging() -> None:
 
 
 def log_event(event: str, **fields) -> None:
-    payload = {"event": event, "request_id": request_id_var.get(), **fields}
-    logging.getLogger("shopping").info(json.dumps(payload))
+    line = json.dumps({"event": event, "request_id": request_id_var.get(), **fields})
+    # stdout is what `docker compose logs api` shows.the shopping logger can be quiet under uvicorn.
+    print(line, flush=True)
 
 
 class RequestLogMiddleware(BaseHTTPMiddleware):

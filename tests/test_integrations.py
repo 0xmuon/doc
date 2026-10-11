@@ -9,22 +9,55 @@ from app.integrations import CircuitBreaker, CircuitOpenError, DeclineError, Gat
 from tests.fakes import json_response, scripted_transport
 
 
-def test_breaker_opens_and_fails_fast():
-    breaker = CircuitBreaker("payment", max_failures=2, reset_seconds=60)
+def test_breaker_half_open_then_off():
+    breaker = CircuitBreaker("payment", max_failures=3, reset_seconds=60)
+    calls = {"n": 0}
+
+    async def down():
+        calls["n"] += 1
+        raise GatewayError("timeout")
+
+    async def run():
+        for _ in range(3):
+            with pytest.raises(GatewayError):
+                await breaker.call(down)
+        assert breaker.state == "half-open"
+        assert calls["n"] == 3
+        with pytest.raises(GatewayError):
+            await breaker.call(down)
+        assert breaker.state == "open"
+        assert calls["n"] == 4
+        with pytest.raises(CircuitOpenError):
+            await breaker.call(down)
+        assert calls["n"] == 4
+
+    asyncio.run(run())
+
+
+def test_breaker_tries_again_when_the_payment_api_is_back():
+    breaker = CircuitBreaker("payment", max_failures=3, provider_is_up=_up)
 
     async def down():
         raise GatewayError("timeout")
 
+    async def paid():
+        return "ok"
+
     async def run():
-        with pytest.raises(GatewayError):
-            await breaker.call(down)
+        for _ in range(3):
+            with pytest.raises(GatewayError):
+                await breaker.call(down)
         with pytest.raises(GatewayError):
             await breaker.call(down)
         assert breaker.state == "open"
-        with pytest.raises(CircuitOpenError):
-            await breaker.call(down)
+        assert await breaker.call(paid) == "ok"
+        assert breaker.state == "closed"
 
     asyncio.run(run())
+
+
+async def _up() -> bool:
+    return True
 
 
 def test_decline_does_not_open_the_breaker():

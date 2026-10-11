@@ -1,18 +1,16 @@
 """order notice.after checkout this runs in the background so the response is not waiting on it."""
 
-import json
-import logging
 import os
 
 import httpx
 
 from app.integrations import DeclineError, GatewayError, retry_async
 
-logger = logging.getLogger("shopping")
-
 
 def _log(event: str, **fields) -> None:
-    logger.info(json.dumps({"event": event, **fields}))
+    from app.utils.logging_setup import log_event
+
+    log_event(event, **fields)
 
 
 async def send_order_notification(order_id: int, email: str, payment_status: str) -> None:
@@ -45,6 +43,6 @@ async def send_order_notification(order_id: int, email: str, payment_status: str
             base_delay=float(os.getenv("PAYMENT_RETRY_BASE_DELAY", "0.05")),
             operation="notification",
         )
-        _log("order_notification_sent", order_id=order_id)
+        _log("order_notification_sent", order_id=order_id, email=email, payment_status=payment_status)
     except (GatewayError, DeclineError) as exc:
-        _log("order_notification_failed", order_id=order_id, detail=str(exc))
+        _log("order_notification_failed", order_id=order_id, email=email, payment_status=payment_status, detail=str(exc))

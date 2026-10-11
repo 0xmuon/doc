@@ -13,17 +13,34 @@ FAILED = "FAILED"
 # tests can drop in a MockTransport.left empty in the running app.
 http_transport: httpx.AsyncBaseTransport | None = None
 
+async def payment_api_is_on() -> bool:
+    """true only when the fake API mode is ok.fail and slow stay off."""
+    charge_url = os.getenv("PAYMENT_API_URL", "").strip()
+    if "/payments/" not in charge_url:
+        return False
+    mode_url = charge_url.split("/payments/", 1)[0].rstrip("/") + "/mode"
+    try:
+        async with httpx.AsyncClient(transport=http_transport, timeout=1.0) as client:
+            response = await client.get(mode_url)
+    except httpx.HTTPError:
+        return False
+    if response.status_code != 200:
+        return False
+    return str(response.json().get("mode", "")).lower() == "ok"
+
+
 payment_breaker = CircuitBreaker(
     "payment",
-    max_failures=int(os.getenv("CIRCUIT_MAX_FAILURES", "5")),
+    max_failures=int(os.getenv("CIRCUIT_MAX_FAILURES", "3")),
     reset_seconds=float(os.getenv("CIRCUIT_RESET_SECONDS", "30")),
     excluded=(DeclineError,),
+    provider_is_up=payment_api_is_on,
 )
 
 
 def reset_breaker() -> None:
     payment_breaker.reset()
-    payment_breaker.max_failures = int(os.getenv("CIRCUIT_MAX_FAILURES", "5"))
+    payment_breaker.max_failures = int(os.getenv("CIRCUIT_MAX_FAILURES", "3"))
     payment_breaker.reset_seconds = float(os.getenv("CIRCUIT_RESET_SECONDS", "30"))
 
 
