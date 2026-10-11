@@ -16,7 +16,7 @@ The browser never calls port 9000. That port is the fake payment and email servi
 
 ## What the project is made of
 
-Vite created the React JavaScript template. Tailwind v4 is attached in `vite.config.js` with `@tailwindcss/vite`. There is no `tailwind.config.js`. Styles are utility classes in the components, plus one line in `src/index.css`: `@import "tailwindcss"`. `src/main.jsx` renders `<App />` inside `StrictMode`. `src/App.css` is leftover from the template and is not imported.
+Vite created the React JavaScript template. Tailwind v4 is attached in `vite.config.js` with `@tailwindcss/vite`. There is no `tailwind.config.js`. Styles are utility classes in the components, plus one line in `src/index.css`: `@import "tailwindcss"`. `src/main.jsx` renders `<App />` inside `StrictMode`.
 
 `index.html` has the page title ABC Shop and a viewport meta tag, so the layout can shrink on a phone. The header hides the person’s name below the `sm` breakpoint and keeps the profile icon.
 
@@ -64,7 +64,7 @@ The header brand **ABC Shop** and the **Home** links go to `/home`. The menu is 
 
 Logged out, the right side is a profile icon (goes to login), a blue **Login** button, and a white **Register** button. Logged in, the icon and the person’s name go to `/profile`, and **Log out** is red. Log out does not call the API. It deletes `localStorage` key `abcshop_session` and clears React state. A page that requires login notices the token is gone and sends the browser to `/login`. Home and the product list stay where they are, because guests may view them.
 
-The footer has four columns: a short shop blurb, Shop links, Customer Service labels, and contact. Home in the footer goes to `/home`. **Category**, **Deals**, and **New Arrivals** all go to `/products`. They are not separate catalogs. Help Center, Returns, Shipping, and Contact Us are plain text, not pages. Email is `support@abcshop.example`. Phone is `+1 234 567 890` (`tel:+1234567890`), the number in the week 4 picture. Under the columns is `© 2026 ABC Shop. All Rights Reserved.`
+The footer has four columns: a short shop blurb, Shop links, Customer Service labels, and contact. Home in the footer goes to `/home`. **Category**, **Deals**, and **New Arrivals** all go to `/products`. They are not separate catalogs. Help Center, Returns, Shipping, and Contact Us go to `/help-center`, `/returns`, `/shipping`, and `/contact`. Those paths are not pages, so each one shows **Page not found**. Email is `support@abcshop.example`. Phone is `+1 234 567 890` (`tel:+1234567890`), the number in the week 4 picture. Under the columns is `© 2026 ABC Shop. All Rights Reserved.`
 
 Colors, on purpose: light rose page background, red for the brand and for cancel, logout, reset, and remove, blue for login and the main actions, yellow for Add to Cart, white for Register.
 

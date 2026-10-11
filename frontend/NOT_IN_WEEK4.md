@@ -21,4 +21,4 @@ The rows below are in this shop and are not asked for in that brief. The brief d
 | Prices written as `INR` | `utils/money.js` formats money as `INR 6599`. Whole amounts have no paise. The rupee sign is not used. The pictures use dollar amounts. |
 | Shop prices ending in 99 | `app/db/seed.py` stores whole rupee amounts ending in 99, the nearest such price to the old dollar amount times 83. Orders already placed keep the totals saved at checkout. |
 | Out-of-stock products at the end | The brief says to hide Add to Cart and show “Out of Stock.” This site also moves those cards to the end of the grid. In-stock cards keep the API’s order. Search uses the same sort. |
-| Footer labels that are not separate shops | **Category**, **Deals**, and **New Arrivals** all go to `/products`. Help Center, Returns, Shipping, and Contact Us are text, not pages. |
+| Footer labels that are not separate shops | **Category**, **Deals**, and **New Arrivals** all go to `/products`. Help Center, Returns, Shipping, and Contact Us open **Page not found**. |
