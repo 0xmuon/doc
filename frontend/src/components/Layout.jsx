@@ -103,10 +103,11 @@ function Footer() {
           <p className="font-semibold text-slate-900">Connect</p>
           <ul className="mt-2 space-y-1 text-sm">
             <li><a href="mailto:support@swiftshop.com" className="hover:text-blue-700">support@swiftshop.com</a></li>
-            <li><a href="tel:+919999999999" className="hover:text-blue-700">+91-9999999999</a></li>
+            <li><a href="tel:+1234567890" className="hover:text-blue-700">+1 234 567 890</a></li>
           </ul>
         </div>
       </div>
+      <p className="mx-auto max-w-6xl border-t border-rose-100 px-4 py-4 text-sm">© 2026 SwiftShop. All Rights Reserved.</p>
     </footer>
   );
 }

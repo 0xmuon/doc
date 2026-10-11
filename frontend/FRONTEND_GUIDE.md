@@ -60,7 +60,7 @@ The header brand **SwiftShop** and the **Home** links go to `/home`. The menu is
 
 Logged out, the right side is a profile icon (goes to login), a blue **Login** button, and a white **Register** button. Logged in, the icon and the person’s name go to `/profile`, and **Log out** is red. Log out does not call the API. It deletes `localStorage` key `swiftshop_session` and clears React state. A page that requires login notices the token is gone and sends the browser to `/login`. Home and the product list stay where they are, because guests may view them.
 
-The footer has four columns: a short shop blurb, Shop links, Customer Service labels, and contact. Home in the footer goes to `/home`. **Category**, **Deals**, and **New Arrivals** all go to `/products`. They are not separate catalogs. Help Center, Returns, Shipping, and Contact Us are plain text, not pages. Email is `support@swiftshop.com`. Phone is `+91-9999999999` (`tel:+919999999999`). There is no copyright line.
+The footer has four columns: a short shop blurb, Shop links, Customer Service labels, and contact. Home in the footer goes to `/home`. **Category**, **Deals**, and **New Arrivals** all go to `/products`. They are not separate catalogs. Help Center, Returns, Shipping, and Contact Us are plain text, not pages. Email is `support@swiftshop.com`. Phone is `+1 234 567 890` (`tel:+1234567890`), the number in the week 4 picture. Under the columns is `© 2026 SwiftShop. All Rights Reserved.`
 
 Colors, on purpose: light rose page background, red for the brand and for cancel, logout, reset, and remove, blue for login and the main actions, yellow for Add to Cart, white for Register.
 
@@ -212,7 +212,7 @@ To show an on-hold order you need the fake payment API in fail mode. That is a b
 | Header with brand, navigation, profile | `Layout.jsx` header |
 | Menu of sections | Home, Products, Cart, Orders |
 | Main content changes with the route | `App.jsx` routes inside `Layout` |
-| Footer with shop links and contact | `Layout.jsx` footer. No copyright line. |
+| Footer with shop links, contact, and copyright | `Layout.jsx` footer. Phone is `+1 234 567 890`. The line is `© 2026 SwiftShop. All Rights Reserved.` |
 | Register name, email, password, validations, disabled until valid, reset | `RegisterPage.jsx`. Mobile is extra because the API requires it. |
 | Login email and password, disabled until valid, reset | `LoginPage.jsx` |
 | Product grid, search by name or category, Add to Cart, out of stock | `ProductsPage.jsx` |
@@ -227,7 +227,6 @@ These were added because you asked for them. They are not in the week 4 PDF. Mob
 | What you asked for | What the site does |
 | --- | --- |
 | Light shopping colors: red for cancel, blue for login, yellow for Add to Cart, white for Register | Brand, logout, reset, and Remove are red. Login and the main actions (checkout, view details, pay again) are blue. Add to Cart is yellow. Register is white with a border. The page background is a light rose. |
-| Remove the copyright mark, and use the phone `+91-9999999999` | The footer has no copyright line. The phone link is `tel:+919999999999`. |
 | A real Home page, opened by default, reachable from the navbar | `/` and `/home` render `HomePage.jsx`. The site does not send you to `/products` on open. The header brand and both Home links go to `/home`. The page is four cards: Products, Cart, Orders, and Account. |
 | Profile with the customer’s phone and the orders they have placed | `/profile` shows name, email, and phone. A 10-digit mobile is displayed as `+91-` plus the digits. Role is not shown. The order list is only rows whose payment status is `PAID`. On-hold orders stay on the Orders page. |
 | Quantity as **−** and **+**, not a typed Qty box | Cart, the product list, and product details use `QuantityStepper.jsx`. There is no quantity text field and no separate Update button. |
