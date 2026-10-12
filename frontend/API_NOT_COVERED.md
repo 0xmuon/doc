@@ -17,10 +17,11 @@ These routes are the ones the screens use, so a customer can register, browse, f
 | GET | `/api/cart/{user_id}` | Cart, and the in-cart count on the product list and product page |
 | PUT | `/api/cart/update/{cart_item_id}` | Change quantity from the cart, product list, or product page |
 | DELETE | `/api/cart/remove/{cart_item_id}` | Remove a line, including when minus takes the quantity to zero |
-| POST | `/api/orders/checkout` | Checkout. Payment method is `CARD` (Credit Card) or `COD` (Cash on Delivery) |
+| POST | `/api/orders/checkout` | Checkout. `CARD` charges the gateway. `COD` confirms the order and leaves payment pending, with no gateway call |
 | GET | `/api/orders/me` | Order history, and placed orders on the profile page |
 | GET | `/api/orders/details/{order_id}` | Order details |
-| POST | `/api/payments/process` | Pay again, only when `payment_status` is `FAILED` |
+| POST | `/api/payments/process` | Pay again, only when `payment_status` is `FAILED` and the method is not Cash on Delivery |
+| POST | `/api/orders/{order_id}/return-to-cart` | Return a failed order to the cart |
 
 The cart total and item count are added up in the browser from the cart lines. The API has no cart-summary route.
 
@@ -51,4 +52,4 @@ These exist on port 8000 and are not called by any screen:
 
 Checkout does not offer `UPI` or `NET_BANKING`. The week 4 brief asks for Credit Card and Cash on Delivery only. The checkout route still accepts those other methods if something else calls it.
 
-The fake payment and email API on port 9000 is not called by the browser. The shopping API on port 8000 calls it during checkout.
+The fake payment and email API on port 9000 is not called by the browser. The shopping API on port 8000 calls it during a card checkout. Cash on Delivery does not.

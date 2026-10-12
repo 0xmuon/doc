@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
-import { fetchOrder, retryPayment } from "../api/orderApi";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { fetchOrder, retryPayment, returnOrderToCart } from "../api/orderApi";
 import StatusBadge from "../components/common/StatusBadge";
 import { statusLabels } from "../utils/statusLabels";
 import { useAuth } from "../context/auth-context";
+import { useCart } from "../context/cart-context";
 import { inr } from "../utils/money";
 
 export default function OrderDetailsPage() {
   const { orderId } = useParams();
   const location = useLocation();
   const { token, ready } = useAuth();
+  const { refreshCart } = useCart();
+  const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState("");
 
   useEffect(() => {
     if (!ready || !token) return;
@@ -26,7 +29,7 @@ export default function OrderDetailsPage() {
   }, [ready, token, orderId]);
 
   async function payAgain() {
-    setBusy(true);
+    setBusy("pay");
     setError("");
     try {
       const updated = await retryPayment(order.order_id, token);
@@ -34,7 +37,20 @@ export default function OrderDetailsPage() {
     } catch (err) {
       setError(err.message);
     } finally {
-      setBusy(false);
+      setBusy("");
+    }
+  }
+
+  async function returnToCart() {
+    setBusy("cart");
+    setError("");
+    try {
+      await returnOrderToCart(order.order_id, token);
+      await refreshCart();
+      navigate("/cart");
+    } catch (err) {
+      setError(err.message);
+      setBusy("");
     }
   }
 
@@ -80,9 +96,16 @@ export default function OrderDetailsPage() {
       </table>
       <p className="mt-4 font-semibold">Total {inr(order.total_amount)}</p>
       {order.payment_status === "FAILED" ? (
-        <button type="button" disabled={busy} onClick={payAgain} className="mt-4 rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50">
-          {busy ? "Trying payment..." : "Pay again"}
-        </button>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {order.payment_method !== "COD" ? (
+            <button type="button" disabled={busy !== ""} onClick={payAgain} className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50">
+              {busy === "pay" ? "Trying payment..." : "Pay again"}
+            </button>
+          ) : null}
+          <button type="button" disabled={busy !== ""} onClick={returnToCart} className="rounded border border-red-700 px-4 py-2 text-red-700 hover:bg-red-50 disabled:opacity-50">
+            {busy === "cart" ? "Returning to cart..." : "Return to cart"}
+          </button>
+        </div>
       ) : null}
       {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
     </section>

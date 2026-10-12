@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.db import get_async_db, get_db
 from app.integrations import send_order_notification
 from app.models import User
-from app.schemas import CheckoutRequest, CheckoutResponse, OrderHistoryItem, OrderResponse
+from app.schemas import CartResponse, CheckoutRequest, CheckoutResponse, OrderHistoryItem, OrderResponse
 from app.services import order_service
 from app.utils import get_current_user, require_order_access, require_owner, require_permission
 
@@ -38,6 +38,17 @@ def order_details(order_id: int, current: User = Depends(require_permission("ord
     order = order_service.get_order(db, order_id)
     require_order_access(current, order.user_id)
     return order
+
+
+@router.post("/orders/{order_id}/return-to-cart", response_model=CartResponse, summary="Return failed order to cart")
+def return_failed_order_to_cart(
+    order_id: int,
+    current: User = Depends(require_permission("order:write")),
+    db: Session = Depends(get_db),
+):
+    order = order_service.get_order(db, order_id)
+    require_order_access(current, order.user_id)
+    return order_service.return_to_cart(db, order_id)
 
 
 @router.get("/orders/me", response_model=list[OrderHistoryItem], summary="My orders")

@@ -168,7 +168,7 @@ Requires login. Loads the same cart. The only payment choices are **Credit Card*
 
 **Place order** posts `POST /api/orders/checkout` with `{ user_id, payment_method }`. The button says “Placing order...” and is disabled while busy, when the cart is empty, and when a line is above the stock left.
 
-The browser then goes to `/orders/{order_id}` whether payment succeeded or failed. When `payment_status` is `PAID`, that page shows “Thank you! Your order has been placed.” A failed payment opens the same order page without that sentence. The cart is already cleared. Stock for a failed payment is released by the API. The order remains and can be paid from its details page.
+The browser then goes to `/orders/{order_id}` whether payment succeeded or failed. Cash on Delivery does not call the payment gateway. That order is **Confirmed** and its payment stays **Pending Payment**, because the money is collected on delivery. Thank you shows for that order and for a paid card order. A failed card payment opens the same order page without that sentence. The cart is already cleared. Stock for a failed card payment is released by the API. The order remains and can be paid from its details page, or put back in the cart.
 
 “View order history” still links to `/orders` if they want the full list instead.
 
@@ -184,7 +184,7 @@ Requires login. `GET /api/orders/details/{orderId}`.
 
 Heading is the order number, then the same status pills, the date, and a table of Product, Qty, Price, Subtotal. Qty here is text. A placed order’s quantities cannot be edited. Total is under the table. If checkout just succeeded, the page also shows “Thank you! Your order has been placed.” If the API sent `payment_reference`, it is shown. If the order is not paid and `failure_reason` is set, that sentence is shown. A 403 is “You can only view your own orders.” A 404 is “Order not found.” “Back to order history” goes to `/orders`.
 
-If `payment_status` is `FAILED`, a blue **Pay again** button calls `POST /api/payments/process` with `{ order_id }`. A paid order and an order that is only pending do not show it. On success the same page replaces its data, so a paid retry shows **Paid** and the button goes away. On failure the order stays on screen and the error is shown under it. The button says “Trying payment...” while busy.
+If `payment_status` is `FAILED` and the method is not Cash on Delivery, a blue **Pay again** button calls `POST /api/payments/process` with `{ order_id }`. Beside it, **Return to cart** calls `POST /api/orders/{order_id}/return-to-cart`, puts those lines back in the cart (added onto any matching product already there), deletes that failed order, and opens the cart so more items can be added. A paid order and an order that is only pending do not show either button. On a successful retry the same page replaces its data, so a paid retry shows **Paid** and the buttons go away. On failure the order stays on screen and the error is shown under it. Pay again says “Trying payment...” while busy. Return to cart says “Returning to cart...” while busy.
 
 This is the page checkout opens after every place, paid or failed.
 
@@ -207,7 +207,7 @@ Use this as the live demo.
 7. You land on that order’s page, for example `/orders/6` with heading `ORD-000006`, and only that order’s lines.
 8. Orders in the menu is the full history. Profile is the person’s phone and only the placed orders.
 
-To show a failed payment you need the fake payment API in fail mode. That is a backend switch, not a button in this website. After a failed checkout the browser opens that order. The cart is empty. The pill is **Payment Failed**. Pay again is on its details page only when `payment_status` is `FAILED`.
+To show a failed payment you need the fake payment API in fail mode, and the checkout method must be Credit Card. Cash on Delivery never uses that gateway. After a failed card checkout the browser opens that order. The cart is empty. The pill is **Payment Failed**. Pay again and Return to cart are on its details page only when `payment_status` is `FAILED`.
 
 ## What the week 4 brief maps to
 
@@ -324,9 +324,9 @@ Kept from this app, because it matches this API or a choice you already made:
 
 **Profile “placed” is stricter than the Orders page.** Orders shows on-hold rows. Profile keeps only `PAID`.
 
-**A failed payment still consumes the cart.** The order exists and its pill is **Payment Failed**. The items are not put back in the cart. Checkout opens that order. Pay again is on that page when the payment status is `FAILED`, not a new checkout of the same cart.
+**A failed card payment clears the cart.** The order exists and its pill is **Payment Failed**. Checkout opens that order. Pay again charges the gateway again. Return to cart puts the lines back, removes that failed order, and opens the cart so more products can be added before the next checkout.
 
-**Checkout only redirects when payment status is `PAID`.** That is the meaning of “order placed” on this site.
+**Cash on Delivery does not call the payment gateway.** The order is confirmed and the payment stays pending until delivery. Thank you is shown. Pay again is not shown.
 
 **Quantity on an old order is text.** The details table prints Qty. Changing it would change history, so the box is not there.
 

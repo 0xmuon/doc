@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.integrations import PAID, charge_order
 from app.integrations.payment_gateway import PaymentOutcome
-from app.models import Order, OrderDetail, Product
+from app.models import CartItem, Order, OrderDetail, Product
 from app.repositories import audit_repository, cart_repository, order_repository, user_repository
 from app.schemas import CheckoutRequest, CheckoutResponse, OrderHistoryItem, OrderLineResponse, OrderResponse
 from app.utils import ALLOWED_PAYMENT_METHODS, AppException, NotFoundException, log_event, to_money, utcnow
@@ -142,9 +142,30 @@ def _apply_payment(db: Session, order_id: int, outcome: PaymentOutcome) -> Check
     return CheckoutResponse(message=message, order=_to_order_response(saved))
 
 
+def _confirm_cod(db: Session, order_id: int) -> CheckoutResponse:
+    """cash is collected on delivery,so this order never calls the payment gateway."""
+    order = order_repository.get_by_id(db, order_id)
+    if order is None:
+        raise NotFoundException("Order not found")
+    order.order_status = "CONFIRMED"
+    order.payment_status = "PENDING"
+    order.payment_reference = None
+    order.failure_reason = None
+    audit_repository.record(db, order.user_id, "payment", "order", order.order_id, "PENDING")
+    db.commit()
+    log_event("cod_confirmed", order_id=order_id, payment_status="PENDING", detail="Pay when the order is delivered")
+    saved = order_repository.get_by_id(db, order_id)
+    return CheckoutResponse(
+        message="Order placed successfully. Payment is due on delivery.",
+        order=_to_order_response(saved),
+    )
+
+
 async def checkout(db: AsyncSession, payload: CheckoutRequest) -> CheckoutResponse:
     """db work is run_sync so the driver can await.it does not block the loop on the charge."""
     order_id, total, method, number = await db.run_sync(lambda sync_db: _reserve(sync_db, payload))
+    if method == "COD":
+        return await db.run_sync(lambda sync_db: _confirm_cod(sync_db, order_id))
     # charge is after the commit.a timeout must not roll the order back.
     outcome = await charge_order(order_id, total, method, number)
     return await db.run_sync(lambda sync_db: _apply_payment(sync_db, order_id, outcome))
@@ -211,10 +232,49 @@ async def retry_payment(db: AsyncSession, order_id: int) -> OrderResponse:
     if isinstance(current, OrderResponse):
         return current
     amount, method, status, number = current
+    if method == "COD":
+        if status == "FAILED":
+            await db.run_sync(lambda sync_db: _rehold(sync_db, order_id))
+        return await db.run_sync(lambda sync_db: _confirm_cod(sync_db, order_id))
     if status == "FAILED":
         await db.run_sync(lambda sync_db: _rehold(sync_db, order_id))
     outcome = await charge_order(order_id, amount, method, number)
     return await db.run_sync(lambda sync_db: _store_retry(sync_db, order_id, outcome))
+
+
+def return_to_cart(db: Session, order_id: int):
+    """put a failed order's lines back in the cart and remove that order."""
+    order = order_repository.get_by_id(db, order_id)
+    if order is None:
+        raise NotFoundException("Order not found")
+    if order.payment_status != "FAILED":
+        raise AppException("Only an order with a failed payment can go back to the cart")
+    user_id = order.user_id
+    lines = [(line.product_id, line.quantity) for line in order.details]
+    ids = [product_id for product_id, _quantity in lines]
+    locked = list(db.scalars(select(Product).where(Product.product_id.in_(ids)).with_for_update()).all())
+    by_id = {row.product_id: row for row in locked}
+    existing = {item.product_id: item for item in cart_repository.list_for_user(db, user_id)}
+    for product_id, quantity in lines:
+        product = by_id.get(product_id)
+        if product is None or not product.is_active:
+            raise AppException("A product on this order is no longer available")
+        current = existing.get(product_id)
+        new_quantity = quantity + (current.quantity if current else 0)
+        if new_quantity > product.available_quantity:
+            raise AppException("Quantity cannot exceed available stock")
+        if current:
+            current.quantity = new_quantity
+        else:
+            db.add(CartItem(user_id=user_id, product_id=product_id, quantity=quantity))
+    for detail in list(order.details):
+        db.delete(detail)
+    db.delete(order)
+    audit_repository.record(db, user_id, "return_to_cart", "order", order_id, "FAILED")
+    db.commit()
+    from app.services import cart_service
+
+    return cart_service.get_cart(db, user_id)
 
 
 def get_order(db: Session, order_id: int) -> OrderResponse:

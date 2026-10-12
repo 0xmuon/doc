@@ -21,8 +21,8 @@ export default function CheckoutPage() {
     try {
       const data = await checkoutOrder({ token, userId: user.user_id, paymentMethod: method });
       await refreshCart().catch(() => setCart({ user_id: user.user_id, items: [] }));
-      const paid = data.order.payment_status === "PAID";
-      navigate(`/orders/${data.order.order_id}`, { state: paid ? { justPlaced: true } : undefined });
+      const failed = data.order.payment_status === "FAILED";
+      navigate(`/orders/${data.order.order_id}`, { state: failed ? undefined : { justPlaced: true } });
     } catch (err) {
       setError(err.message);
       setBusy(false);

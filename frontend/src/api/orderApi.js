@@ -24,3 +24,7 @@ export function retryPayment(orderId, token) {
     body: { order_id: orderId },
   });
 }
+
+export function returnOrderToCart(orderId, token) {
+  return api(`/api/orders/${orderId}/return-to-cart`, { method: "POST", token });
+}
