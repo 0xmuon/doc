@@ -8,7 +8,7 @@ export default function SearchBar({ value, onChange }) {
       value={value}
       onChange={(event) => onChange(event.target.value)}
       placeholder="Search products by name or category..."
-      className="w-full rounded border px-3 py-2"
+      className="field mt-0"
       aria-label="Search products"
       maxLength={100}
     />

@@ -5,9 +5,9 @@ import Header from "./Header";
 
 export default function Layout() {
   return (
-    <div className="flex min-h-screen flex-col bg-rose-50/40 text-slate-900">
+    <div className="flex min-h-screen flex-col bg-rose-50/60 text-slate-900">
       <Header />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
         <Outlet />
       </main>
       <Footer />

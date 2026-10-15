@@ -8,42 +8,64 @@ import { MAX_QUANTITY_PER_ITEM } from "../utils/validate";
 
 export function CartProvider({ children }) {
   const { token, user, ready } = useAuth();
-  const [cart, setCart] = useState(null);
+  const [cartState, setCartState] = useState(null);
+  const [cartError, setCartError] = useState("");
+  const userId = user?.user_id;
 
   const refreshCart = useCallback(async () => {
-    if (!token || !user) {
-      setCart({ items: [] });
+    if (!token || !userId) {
+      setCartError("");
       return { items: [] };
     }
-    const data = await fetchCart(user.user_id, token);
-    setCart(data);
-    return data;
-  }, [token, user]);
+    try {
+      const data = await fetchCart(userId, token);
+      setCartState({ userId, cart: data });
+      setCartError("");
+      return data;
+    } catch (err) {
+      setCartError(err.message || "Could not load the cart.");
+      throw err;
+    }
+  }, [token, userId]);
 
   useEffect(() => {
-    if (!ready || !token || !user) return undefined;
+    if (!ready || !token || !userId) return undefined;
     let ignore = false;
-    fetchCart(user.user_id, token)
+    fetchCart(userId, token)
       .then((data) => {
-        if (!ignore) setCart(data);
+        if (ignore) return;
+        setCartState({ userId, cart: data });
+        setCartError("");
       })
-      .catch(() => {
-        if (!ignore) setCart({ items: [] });
+      .catch((err) => {
+        if (!ignore) setCartError(err.message || "Could not load the cart.");
       });
     return () => {
       ignore = true;
     };
-  }, [ready, token, user]);
+  }, [ready, token, userId]);
+
+  const setCart = useCallback((next) => {
+    setCartState((current) => {
+      const previous = current?.userId === userId ? current.cart : { items: [] };
+      const cart = typeof next === "function" ? next(previous) : next;
+      return { userId, cart };
+    });
+    setCartError("");
+  }, [userId]);
 
   const value = useMemo(() => {
-    const visible = token && user ? cart : { items: [] };
+    const signedIn = Boolean(token && userId);
+    const mine = signedIn && cartState?.userId === userId ? cartState.cart : null;
+    const visible = signedIn ? mine : { items: [] };
+    const visibleError = signedIn ? cartError : "";
     const items = visible?.items ?? [];
     const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
     const overStock = items.some(
       (item) => item.quantity > item.available_quantity || item.quantity > MAX_QUANTITY_PER_ITEM,
     );
-    return { cart: visible, items, itemCount, overStock, refreshCart, setCart };
-  }, [cart, refreshCart, token, user]);
+    return { cart: visible, cartError: visibleError, items, itemCount, overStock, refreshCart, setCart };
+  }, [cartError, cartState, refreshCart, setCart, token, userId]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

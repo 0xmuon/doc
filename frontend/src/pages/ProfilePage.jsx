@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchCurrentUser } from "../api/authApi";
 import { fetchMyOrders } from "../api/orderApi";
+import { ErrorState, LoadingState } from "../components/common/StatusMessage";
 import OrderListItem from "../components/orders/OrderListItem";
 import { useAuth } from "../context/auth-context";
 
@@ -22,42 +23,57 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState(null);
   const [orders, setOrders] = useState(null);
   const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready) return undefined;
     if (!token) {
       navigate("/login");
-      return;
+      return undefined;
     }
+    let ignore = false;
     Promise.all([fetchCurrentUser(token), fetchMyOrders(token)])
       .then(([me, history]) => {
+        if (ignore) return;
         setProfile(me);
         setOrders(history.filter((order) => order.payment_status === "PAID"));
         setError("");
       })
-      .catch((err) => setError(err.message));
-  }, [ready, token, navigate]);
+      .catch((err) => {
+        if (!ignore) setError(err.message);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [ready, token, navigate, attempt]);
 
-  if (error) return <p className="text-sm text-red-700">{error}</p>;
-  if (!profile || !orders) return <p className="text-sm">Loading profile...</p>;
+  if (error) {
+    return (
+      <section>
+        <h1 className="page-title">Profile</h1>
+        <ErrorState message={error} onRetry={() => { setError(""); setProfile(null); setOrders(null); setAttempt((value) => value + 1); }} />
+      </section>
+    );
+  }
+  if (!profile || !orders) return <LoadingState label="Loading profile..." />;
 
   return (
     <section>
-      <h1 className="text-2xl font-semibold">Profile</h1>
-      <article className="mt-4 rounded border border-rose-100 bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold">{profile.name}</h2>
-        <dl className="mt-3 space-y-2 text-sm">
+      <h1 className="page-title">Profile</h1>
+      <article className="panel mt-5 p-5">
+        <h2 className="text-xl font-semibold text-slate-900">{profile.name}</h2>
+        <dl className="mt-4 space-y-3 text-sm">
           <div className="flex flex-wrap gap-2">
-            <dt className="w-28 text-neutral-500">Email</dt>
-            <dd>{profile.email}</dd>
+            <dt className="w-28 text-slate-500">Email</dt>
+            <dd className="font-medium text-slate-900">{profile.email}</dd>
           </div>
           <div className="flex flex-wrap gap-2">
-            <dt className="w-28 text-neutral-500">Phone</dt>
-            <dd>{phoneLabel(profile.mobile)}</dd>
+            <dt className="w-28 text-slate-500">Phone</dt>
+            <dd className="font-medium text-slate-900">{phoneLabel(profile.mobile)}</dd>
           </div>
         </dl>
       </article>
-      <h2 className="mt-8 text-xl font-semibold">Placed orders</h2>
+      <h2 className="mt-8 text-xl font-semibold tracking-tight text-slate-900">Placed orders</h2>
       {orders.length === 0 ? <p className="mt-4 text-sm">No placed orders yet.</p> : null}
       <ul className="mt-4 space-y-4">
         {orders.map((order) => (

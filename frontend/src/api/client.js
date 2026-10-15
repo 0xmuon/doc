@@ -94,11 +94,16 @@ export async function api(path, { method = "GET", body, token } = {}, allowRefre
   const access = token || tokenStore.getAccess();
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (access) headers.Authorization = `Bearer ${access}`;
-  const response = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError("The shop could not be reached. Check your connection and try again.", 0);
+  }
   if (response.status === 401 && allowRefresh && path !== "/api/auth/refresh") {
     const renewed = await refreshTokens();
     if (renewed) return api(path, { method, body, token: tokenStore.getAccess() }, false);
@@ -115,8 +120,12 @@ export async function api(path, { method = "GET", body, token } = {}, allowRefre
     }
   }
   if (!response.ok) {
-    const parsed = messageFrom(data, response.statusText);
     const requestId = response.headers.get("X-Request-ID") || data?.request_id || "";
+    if (response.status === 502 || response.status === 503 || response.status === 504) {
+      const down = "The shop is unavailable right now. Try again in a moment.";
+      throw new ApiError(requestId ? `${down} (ref: ${requestId})` : down, response.status, {}, requestId);
+    }
+    const parsed = messageFrom(data, response.statusText);
     const message = requestId ? `${parsed.message} (ref: ${requestId})` : parsed.message;
     throw new ApiError(message, response.status, parsed.fieldErrors, requestId);
   }

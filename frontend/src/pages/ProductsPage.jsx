@@ -4,6 +4,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { ErrorNote, ErrorState, LoadingState } from "../components/common/StatusMessage";
 import SearchBar from "../components/products/SearchBar";
 import ProductCard from "../components/products/ProductCard";
 import { fetchCategories, fetchProducts, searchProducts } from "../api/productApi";
@@ -40,6 +41,8 @@ export default function ProductsPage() {
   const [products, setProducts] = useState([]);
   const [loadedKey, setLoadedKey] = useState(null);
   const [error, setError] = useState("");
+  const [categoryError, setCategoryError] = useState("");
+  const [reload, setReload] = useState(0);
   const [pendingId, setPendingId] = useState(0);
   const [stockError, setStockError] = useState({ id: 0, message: "" });
   const pendingRef = useRef(0);
@@ -48,10 +51,20 @@ export default function ProductsPage() {
   const loaded = loadedKey === requestKey;
 
   useEffect(() => {
+    let ignore = false;
     fetchCategories()
-      .then(setCategories)
-      .catch((err) => setError(err.message));
-  }, []);
+      .then((rows) => {
+        if (ignore) return;
+        setCategories(rows);
+        setCategoryError("");
+      })
+      .catch((err) => {
+        if (!ignore) setCategoryError(err.message);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [reload]);
 
   useEffect(() => {
     let ignore = false;
@@ -74,7 +87,14 @@ export default function ProductsPage() {
     return () => {
       ignore = true;
     };
-  }, [debouncedName, category]);
+  }, [debouncedName, category, reload]);
+
+  function retryLoad() {
+    setError("");
+    setCategoryError("");
+    setLoadedKey(null);
+    setReload((current) => current + 1);
+  }
 
   async function changeQuantity(product, nextQuantity) {
     if (!token || !user) {
@@ -107,13 +127,14 @@ export default function ProductsPage() {
 
   return (
     <section>
-      <h1 className="text-2xl font-semibold">Products</h1>
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+      <h1 className="page-title">Products</h1>
+      <p className="mt-2 text-sm text-slate-600">Search by name or category. Items that are out of stock stay at the end of the list.</p>
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <SearchBar value={name} onChange={setName} />
         <select
           value={category}
           onChange={(event) => setCategory(event.target.value)}
-          className="rounded border px-3 py-2"
+          className="field mt-0 sm:max-w-xs"
           aria-label="Search by category"
         >
           <option value="">All categories</option>
@@ -124,9 +145,10 @@ export default function ProductsPage() {
           ))}
         </select>
       </div>
-      {error ? <p className="mt-4 text-sm text-red-700">{error}</p> : null}
-      {!loaded && !error ? <p className="mt-6 text-sm">Loading products...</p> : null}
-      {loaded && !error && products.length === 0 ? <p className="mt-6 text-sm text-neutral-600">No products found.</p> : null}
+      {categoryError ? <div className="mt-4"><ErrorNote message={categoryError} /></div> : null}
+      {error ? <ErrorState message={error} onRetry={retryLoad} /> : null}
+      {!loaded && !error ? <LoadingState label="Loading products..." /> : null}
+      {loaded && !error && products.length === 0 ? <p className="panel mt-6 px-4 py-8 text-center text-sm text-slate-600">No products found.</p> : null}
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {products.map((product) => (
           <ProductCard

@@ -4,6 +4,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { ErrorNote, ErrorState, LoadingState } from "../components/common/StatusMessage";
 import { fetchProduct } from "../api/productApi";
 import { useAuth } from "../context/auth-context";
 import { useCart } from "../context/cart-context";
@@ -22,6 +23,7 @@ export default function ProductDetailsPage() {
   const [quantity, setQuantity] = useState("1");
   const [quantityError, setQuantityError] = useState("");
   const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const pendingRef = useRef(false);
   const cartLine = items.find((item) => item.product_id === Number(productId)) || null;
@@ -45,7 +47,7 @@ export default function ProductDetailsPage() {
     return () => {
       ignore = true;
     };
-  }, [productId]);
+  }, [productId, attempt]);
 
   async function addToCart() {
     if (pendingRef.current || !current) return;
@@ -84,58 +86,64 @@ export default function ProductDetailsPage() {
   if (loadedId === productId && error && !current) {
     return (
       <section>
-        <p className="text-sm text-red-700">{error}</p>
-        <Link to="/products" className="mt-3 inline-block text-sm underline">Back to products</Link>
+        <ErrorState message={error} onRetry={() => { setError(""); setLoadedId(null); setAttempt((value) => value + 1); }} />
+        <Link to="/products" className="btn-outline mt-4">Back to products</Link>
       </section>
     );
   }
-  if (!current) return <p className="text-sm">Loading product...</p>;
+  if (!current) return <LoadingState label="Loading product..." />;
   const inStock = current.available_quantity > 0;
 
   return (
-    <article className="mx-auto max-w-2xl">
-      <Link to="/products" className="text-sm underline">Back to products</Link>
-      <h1 className="mt-3 text-2xl font-semibold">{current.product_name}</h1>
-      <p className="text-sm text-neutral-500">{current.category_name || "Uncategorised"}</p>
-      {current.product_url ? (
-        <img src={current.product_url} alt={current.product_name} className="mt-4 h-64 w-full object-contain" />
-      ) : null}
-      <p className="mt-4">{current.description || "No description available."}</p>
-      <p className="mt-2 font-medium">{inr(current.price)}</p>
-      <p className="text-sm text-neutral-600">SKU {current.sku}</p>
-      <p className="text-sm text-neutral-600">{inStock ? `${current.available_quantity} in stock` : "Out of Stock"}</p>
-      <p className="mt-1 text-sm text-slate-700">In cart: {cartLine?.quantity || 0}</p>
-      {inStock ? (
-        <div className="mt-4 flex flex-wrap items-end gap-2">
-          <label className="text-sm">
-            Qty
-            <input
-              type="number"
-              min="1"
-              value={quantity}
-              onChange={(event) => {
-                setQuantity(event.target.value);
-                setQuantityError("");
-              }}
-              aria-label="Quantity"
-              disabled={busy}
-              className="mt-1 block w-20 rounded border px-2 py-2"
-            />
-          </label>
-          <button
-            type="button"
-            disabled={busy || (cartLine?.quantity || 0) >= current.available_quantity || (cartLine?.quantity || 0) >= MAX_QUANTITY_PER_ITEM}
-            onClick={addToCart}
-            className="rounded bg-yellow-400 px-4 py-2 font-medium text-slate-900 hover:bg-yellow-300 disabled:opacity-50"
-          >
-            {busy ? "Adding..." : "Add to Cart"}
-          </button>
-        </div>
-      ) : (
-        <p className="mt-4 font-medium text-red-700">Out of Stock</p>
-      )}
-      {quantityError ? <p className="mt-2 text-sm text-red-700">{quantityError}</p> : null}
-      {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
+    <article className="panel mx-auto grid max-w-4xl gap-6 p-5 sm:p-8 lg:grid-cols-2">
+      <div>
+        <Link to="/products" className="text-sm font-medium text-blue-700 hover:underline">Back to products</Link>
+        {current.product_url ? (
+          <img src={current.product_url} alt={current.product_name} className="mt-4 h-72 w-full rounded-xl bg-slate-50 object-contain p-4" />
+        ) : (
+          <div className="mt-4 flex h-72 items-center justify-center rounded-xl bg-slate-50 text-sm text-slate-400">No image</div>
+        )}
+      </div>
+      <div>
+        <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">{current.category_name || "Uncategorised"}</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">{current.product_name}</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-600">{current.description || "No description available."}</p>
+        <p className="mt-4 text-2xl font-semibold text-slate-900">{inr(current.price)}</p>
+        <p className="mt-2 text-sm text-slate-500">SKU {current.sku}</p>
+        <p className={`mt-1 text-sm font-medium ${inStock ? "text-slate-700" : "text-red-700"}`}>{inStock ? `${current.available_quantity} in stock` : "Out of Stock"}</p>
+        <p className="mt-1 text-sm text-slate-700">In cart: {cartLine?.quantity || 0}</p>
+        {inStock ? (
+          <div className="mt-5 flex flex-wrap items-end gap-3">
+            <label className="field-label">
+              Qty
+              <input
+                type="number"
+                min="1"
+                value={quantity}
+                onChange={(event) => {
+                  setQuantity(event.target.value);
+                  setQuantityError("");
+                }}
+                aria-label="Quantity"
+                disabled={busy}
+                className="field w-24"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={busy || (cartLine?.quantity || 0) >= current.available_quantity || (cartLine?.quantity || 0) >= MAX_QUANTITY_PER_ITEM}
+              onClick={addToCart}
+              className="btn-cart"
+            >
+              {busy ? "Adding..." : "Add to Cart"}
+            </button>
+          </div>
+        ) : (
+          <p className="mt-5 font-semibold text-red-700">Out of Stock</p>
+        )}
+        {quantityError ? <p className="mt-2 text-sm text-red-700">{quantityError}</p> : null}
+        {error ? <div className="mt-3"><ErrorNote message={error} /></div> : null}
+      </div>
     </article>
   );
 }

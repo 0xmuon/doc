@@ -1,5 +1,61 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+}
+
 body {
   margin: 0;
+  font-family: var(--font-sans);
+}
+
+@layer components {
+  .page-title {
+    @apply text-3xl font-semibold tracking-tight text-slate-900;
+  }
+
+  .panel {
+    @apply rounded-2xl border border-rose-100 bg-white shadow-sm;
+  }
+
+  .field {
+    @apply mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100;
+  }
+
+  .field-label {
+    @apply block text-sm font-medium text-slate-800;
+  }
+
+  .field-error {
+    @apply mt-1 block text-sm text-red-700;
+  }
+
+  .btn,
+  .btn-primary,
+  .btn-cart,
+  .btn-danger,
+  .btn-outline,
+  .btn-outline-danger {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply bg-blue-600 text-white shadow-sm hover:bg-blue-700;
+  }
+
+  .btn-cart {
+    @apply bg-yellow-400 text-slate-900 shadow-sm hover:bg-yellow-300;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white shadow-sm hover:bg-red-700;
+  }
+
+  .btn-outline {
+    @apply border border-slate-300 bg-white text-slate-800 shadow-sm hover:bg-slate-50;
+  }
+
+  .btn-outline-danger {
+    @apply border border-red-600 bg-white text-red-700 hover:bg-red-50;
+  }
 }

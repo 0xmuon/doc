@@ -15,32 +15,35 @@ function ProfileIcon() {
 export default function Header() {
   const { user, logout } = useAuth();
   return (
-    <header className="border-b border-rose-100 bg-white">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
-        <Link to="/home" className="text-lg font-semibold tracking-tight text-red-600">
+    <header className="sticky top-0 z-40 border-b border-rose-100 bg-white/95 shadow-sm backdrop-blur">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <Link to="/home" className="order-1 flex items-center gap-2 text-lg font-bold tracking-tight text-red-600">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 text-sm text-white">A</span>
           ABC Shop
         </Link>
         <Menu />
-        <div className="flex items-center gap-3 text-sm">
+        <div className="order-2 flex items-center gap-2 text-sm md:order-3">
           {user ? (
             <>
-              <Link to="/profile" className="inline-flex items-center gap-1 text-slate-700 hover:text-blue-700" title={user.email}>
-                <ProfileIcon />
-                <span className="hidden sm:inline">{user.name}</span>
+              <Link to="/profile" className="inline-flex items-center gap-2 rounded-full px-2 py-1 text-slate-700 hover:bg-slate-100 hover:text-blue-700" title={user.email}>
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-700">
+                  <ProfileIcon />
+                </span>
+                <span className="hidden font-medium sm:inline">{user.name}</span>
               </Link>
-              <button type="button" className="rounded-full bg-red-600 px-3 py-1 text-white" onClick={logout}>
+              <button type="button" className="btn-danger px-3 py-1.5" onClick={logout}>
                 Log out
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" aria-label="Profile" className="text-slate-700 hover:text-blue-700">
+              <Link to="/login" aria-label="Profile" className="flex h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 hover:text-blue-700">
                 <ProfileIcon />
               </Link>
-              <Link to="/login" className="rounded bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-700">
+              <Link to="/login" className="btn-primary px-3 py-1.5">
                 Login
               </Link>
-              <Link to="/register" className="rounded border border-slate-300 bg-white px-3 py-1.5 text-slate-800 hover:bg-slate-50">
+              <Link to="/register" className="btn-outline px-3 py-1.5">
                 Register
               </Link>
             </>

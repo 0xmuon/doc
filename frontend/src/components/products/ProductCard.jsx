@@ -8,32 +8,36 @@ export default function ProductCard({ product, cartQuantity, onChange, busy, mes
   const inStock = product.available_quantity > 0;
   const quantity = cartQuantity || 0;
   return (
-    <article className="flex flex-col rounded border border-rose-100 bg-white p-4 shadow-sm">
+    <article className="panel flex flex-col overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md">
       <Link to={`/products/${product.product_id}`} className="block">
         {product.product_url ? (
-          <img src={product.product_url} alt={product.product_name} className="h-40 w-full object-contain" />
+          <img src={product.product_url} alt={product.product_name} className="h-48 w-full bg-slate-50 object-contain p-4" />
         ) : (
-          <div className="flex h-40 items-center justify-center bg-neutral-100 text-sm text-neutral-500">No image</div>
+          <div className="flex h-48 items-center justify-center bg-slate-50 text-sm text-slate-400">No image</div>
         )}
-        <h2 className="mt-3 text-base font-semibold">{product.product_name}</h2>
+        <div className="px-4 pt-4">
+          <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">{product.category_name || "Uncategorised"}</p>
+          <h2 className="mt-1 text-base font-semibold text-slate-900">{product.product_name}</h2>
+        </div>
       </Link>
-      <p className="text-sm text-neutral-500">{product.category_name || "Uncategorised"}</p>
-      <p className="mt-2 line-clamp-3 text-sm text-neutral-700">{product.description || "No description available."}</p>
-      <p className="mt-2 font-medium">{inr(product.price)}</p>
-      <p className="mt-1 text-sm text-slate-700">In cart: {quantity}</p>
-      {inStock ? (
-        <button
-          type="button"
-          className="mt-3 w-fit rounded bg-yellow-400 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-yellow-300 disabled:opacity-50"
-          onClick={() => onChange(product, quantity + 1)}
-          disabled={busy || quantity >= product.available_quantity || quantity >= MAX_QUANTITY_PER_ITEM}
-        >
-          {busy ? "Updating..." : "Add to Cart"}
-        </button>
-      ) : (
-        <p className="mt-3 text-sm font-medium text-red-700">Out of Stock</p>
-      )}
-      {message ? <p className="mt-2 text-sm text-red-700">{message}</p> : null}
+      <div className="flex flex-1 flex-col px-4 pb-4">
+        <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{product.description || "No description available."}</p>
+        <p className="mt-3 text-lg font-semibold text-slate-900">{inr(product.price)}</p>
+        <p className="mt-1 text-sm text-slate-600">In cart: {quantity}</p>
+        {inStock ? (
+          <button
+            type="button"
+            className="btn-cart mt-4 w-fit"
+            onClick={() => onChange(product, quantity + 1)}
+            disabled={busy || quantity >= product.available_quantity || quantity >= MAX_QUANTITY_PER_ITEM}
+          >
+            {busy ? "Updating..." : "Add to Cart"}
+          </button>
+        ) : (
+          <p className="mt-4 text-sm font-semibold text-red-700">Out of Stock</p>
+        )}
+        {message ? <p className="mt-2 text-sm text-red-700">{message}</p> : null}
+      </div>
     </article>
   );
 }

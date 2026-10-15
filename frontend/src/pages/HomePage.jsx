@@ -24,33 +24,36 @@ const areas = [
 export default function HomePage() {
   return (
     <section>
-      <h1 className="text-2xl font-semibold">Home</h1>
-      <p className="mt-3 max-w-2xl text-slate-700">
-        ABC Shop is the online shop. Look through products, add what you need to the cart, and check out.
-      </p>
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-red-700 via-red-600 to-rose-500 px-6 py-10 text-white shadow-sm sm:px-10 sm:py-14">
+        <p className="text-sm font-semibold tracking-wide text-rose-100">ABC Shop</p>
+        <h1 className="mt-2 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">Everyday products, ready when you are.</h1>
+        <p className="mt-3 max-w-xl text-base leading-7 text-rose-50">
+          ABC Shop is the online shop. Look through products, add what you need to the cart, and check out.
+        </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link to="/products" className="btn-cart">Browse products</Link>
+          <Link to="/login" className="btn bg-white text-slate-900 hover:bg-rose-50">Login</Link>
+        </div>
+      </div>
+      <div className="mt-8 grid gap-4 sm:grid-cols-3">
         {areas.map((area) => (
-          <article key={area.title} className="flex flex-col rounded border border-rose-100 bg-white p-4 shadow-sm">
-            <h2 className="text-base font-semibold">{area.title}</h2>
-            <p className="mt-2 flex-1 text-sm text-slate-700">{area.text}</p>
-            <Link to={area.to} className="mt-4 inline-block rounded bg-blue-600 px-3 py-2 text-center text-sm text-white hover:bg-blue-700">
+          <article key={area.title} className="panel flex flex-col p-5">
+            <h2 className="text-lg font-semibold text-slate-900">{area.title}</h2>
+            <p className="mt-2 flex-1 text-sm leading-6 text-slate-600">{area.text}</p>
+            <Link to={area.to} className="btn-primary mt-5">
               {area.label}
             </Link>
           </article>
         ))}
       </div>
-      <article className="mt-4 rounded border border-rose-100 bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold">Account</h2>
-        <p className="mt-2 text-sm text-slate-700">
+      <article className="panel mt-4 p-5">
+        <h2 className="text-lg font-semibold text-slate-900">Account</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
           New shoppers register with a name, email, and password. Returning shoppers log in with email and password.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
-          <Link to="/login" className="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
-            Login
-          </Link>
-          <Link to="/register" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50">
-            Register
-          </Link>
+          <Link to="/login" className="btn-primary">Login</Link>
+          <Link to="/register" className="btn-outline">Register</Link>
         </div>
       </article>
     </section>

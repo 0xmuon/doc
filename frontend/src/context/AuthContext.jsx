@@ -33,6 +33,7 @@ function writeSession(next) {
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(readSession);
   const [ready, setReady] = useState(() => !readSession()?.token);
+  const [sessionNotice, setSessionNotice] = useState("");
 
   useEffect(() => {
     setTokensRefreshedHandler((data) => {
@@ -62,6 +63,7 @@ export function AuthProvider({ children }) {
       .catch(() => {
         writeSession(null);
         setSession(null);
+        setSessionNotice("Your session ended. Please log in again.");
       })
       .finally(() => setReady(true));
   }, []);
@@ -69,6 +71,10 @@ export function AuthProvider({ children }) {
   const value = useMemo(() => {
     return {
       ready,
+      sessionNotice,
+      clearSessionNotice() {
+        setSessionNotice("");
+      },
       token: session?.token ?? "",
       user: session?.user ?? null,
       async login(email, password) {
@@ -85,7 +91,7 @@ export function AuthProvider({ children }) {
         setSession(null);
       },
     };
-  }, [ready, session]);
+  }, [ready, session, sessionNotice]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

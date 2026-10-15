@@ -4,11 +4,10 @@
  */
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ErrorNote } from "../components/common/StatusMessage";
 import { safeReturnPath, useAuth } from "../context/auth-context";
 import { useForm } from "../hooks/useForm";
 import { validateEmail, validateLoginPassword } from "../utils/validate";
-
-const empty = { email: "", password: "" };
 
 function validate(values) {
   return {
@@ -18,13 +17,13 @@ function validate(values) {
 }
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, sessionNotice, clearSessionNotice } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const form = useForm(empty, validate);
+  const form = useForm({ email: location.state?.email || "", password: "" }, validate);
   const [serverError, setServerError] = useState("");
   const [busy, setBusy] = useState(false);
-  const notice = location.state?.message || "";
+  const notice = location.state?.message || sessionNotice || "";
 
   async function onSubmit(event) {
     event.preventDefault();
@@ -34,6 +33,7 @@ export default function LoginPage() {
     setServerError("");
     try {
       await login(form.values.email.trim(), form.values.password);
+      clearSessionNotice();
       navigate(safeReturnPath(location.state?.from), { replace: true });
     } catch (error) {
       setServerError(error.status === 401 ? "Invalid email or password" : error.message);
@@ -43,28 +43,34 @@ export default function LoginPage() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mx-auto max-w-md space-y-4" noValidate>
-      <h1 className="text-center text-2xl font-semibold">Login</h1>
-      {notice && !serverError ? <p className="text-sm text-blue-700">{notice}</p> : null}
-      <label className="block text-sm">
+    <form onSubmit={onSubmit} className="panel mx-auto max-w-md space-y-4 p-6 sm:p-8" noValidate>
+      <div className="text-center">
+        <p className="text-sm font-semibold tracking-wide text-red-600">ABC Shop</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">Welcome back</h1>
+        <p className="mt-2 text-sm text-slate-600">Sign in with the email and password for your account.</p>
+      </div>
+      {notice && !serverError ? (
+        <p className="rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">{notice}</p>
+      ) : null}
+      <label className="field-label">
         Email address
-        <input name="email" type="email" value={form.values.email} onChange={form.handleChange} onBlur={form.handleBlur} className="mt-1 w-full rounded border px-3 py-2" />
-        {form.visibleError("email") ? <span className="text-red-700">{form.visibleError("email")}</span> : null}
+        <input name="email" type="email" autoComplete="email" value={form.values.email} onChange={form.handleChange} onBlur={form.handleBlur} className="field" />
+        {form.visibleError("email") ? <span className="field-error">{form.visibleError("email")}</span> : null}
       </label>
-      <label className="block text-sm">
+      <label className="field-label">
         Password
-        <input name="password" type="password" value={form.values.password} onChange={form.handleChange} onBlur={form.handleBlur} className="mt-1 w-full rounded border px-3 py-2" />
-        {form.visibleError("password") ? <span className="text-red-700">{form.visibleError("password")}</span> : null}
+        <input name="password" type="password" autoComplete="current-password" value={form.values.password} onChange={form.handleChange} onBlur={form.handleBlur} className="field" />
+        {form.visibleError("password") ? <span className="field-error">{form.visibleError("password")}</span> : null}
       </label>
-      {serverError ? <p className="text-sm text-red-700">{serverError}</p> : null}
-      <button type="submit" disabled={!form.isValid || busy} className="w-full rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 disabled:opacity-50">
+      {serverError ? <ErrorNote message={serverError} /> : null}
+      <button type="submit" disabled={!form.isValid || busy} className="btn-primary w-full">
         {busy ? "Logging in..." : "Login"}
       </button>
-      <button type="button" className="w-full rounded bg-red-600 px-3 py-2 text-white hover:bg-red-700" onClick={() => { form.reset(); setServerError(""); }}>
+      <button type="button" className="btn-danger w-full" onClick={() => { form.reset(); setServerError(""); }}>
         Reset
       </button>
-      <p className="text-center text-sm">
-        Don&apos;t have an account? <Link to="/register" className="underline">Register</Link>
+      <p className="text-center text-sm text-slate-600">
+        Don&apos;t have an account? <Link to="/register" className="font-semibold text-blue-700 hover:underline">Register</Link>
       </p>
     </form>
   );
