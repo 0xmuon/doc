@@ -20,11 +20,11 @@ export default function Footer() {
         </div>
         <div>
           <p className="font-semibold text-white">Customer Service</p>
-          <ul className="mt-2 space-y-1.5 text-sm text-slate-400">
-            <li>Help Center</li>
-            <li>Returns</li>
-            <li>Shipping</li>
-            <li>Contact Us</li>
+          <ul className="mt-2 space-y-1.5 text-sm">
+            <li><Link to="/help-center" className="hover:text-white">Help Center</Link></li>
+            <li><Link to="/returns" className="hover:text-white">Returns</Link></li>
+            <li><Link to="/shipping" className="hover:text-white">Shipping</Link></li>
+            <li><Link to="/contact-us" className="hover:text-white">Contact Us</Link></li>
           </ul>
         </div>
         <div>

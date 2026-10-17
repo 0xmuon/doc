@@ -29,6 +29,7 @@ async def checkout(
         result.order.order_id,
         current.email,
         result.order.payment_status,
+        "checkout",
     )
     return result
 

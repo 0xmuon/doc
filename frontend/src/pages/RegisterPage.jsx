@@ -84,7 +84,7 @@ export default function RegisterPage() {
       if (error.status === 409 || /email/i.test(error.message)) {
         setEmailTaken("This email is already registered");
       } else {
-        setServerError(error.message);
+        setServerError(`Registration failed: ${error.message}`);
       }
     } finally {
       setBusy(false);

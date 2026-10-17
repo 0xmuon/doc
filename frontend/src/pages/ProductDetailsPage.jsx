@@ -9,20 +9,22 @@ import { fetchProduct } from "../api/productApi";
 import { useAuth } from "../context/auth-context";
 import { useCart } from "../context/cart-context";
 import { setCartQuantity } from "../utils/cartQuantity";
+import { describeActionError, describeLoadError } from "../utils/loadError";
 import { inr } from "../utils/money";
 import { MAX_QUANTITY_PER_ITEM, validateQuantity } from "../utils/validate";
 
 export default function ProductDetailsPage() {
   const { productId } = useParams();
   const { token, user } = useAuth();
-  const { items, refreshCart } = useCart();
+  const { items, refreshCart, notifyAdded } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
   const [product, setProduct] = useState(null);
   const [loadedId, setLoadedId] = useState(null);
   const [quantity, setQuantity] = useState("1");
   const [quantityError, setQuantityError] = useState("");
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState(null);
+  const [actionError, setActionError] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const pendingRef = useRef(false);
@@ -35,13 +37,13 @@ export default function ProductDetailsPage() {
       .then((row) => {
         if (ignore) return;
         setProduct(row);
-        setError("");
+        setLoadError(null);
         setLoadedId(productId);
       })
       .catch((err) => {
         if (ignore) return;
         setProduct(null);
-        setError(err.status === 404 ? "Product not found." : err.message);
+        setLoadError(describeLoadError("product data", err));
         setLoadedId(productId);
       });
     return () => {
@@ -63,7 +65,7 @@ export default function ProductDetailsPage() {
     }
     pendingRef.current = true;
     setBusy(true);
-    setError("");
+    setActionError("");
     try {
       await setCartQuantity({
         token,
@@ -74,24 +76,29 @@ export default function ProductDetailsPage() {
         line: cartLine,
       });
       await refreshCart();
+      notifyAdded(current.product_name);
       setQuantity("1");
     } catch (err) {
-      setError(err.message);
+      setActionError(describeActionError("Could not add to cart", err));
     } finally {
       pendingRef.current = false;
       setBusy(false);
     }
   }
 
-  if (loadedId === productId && error && !current) {
+  if (loadedId === productId && loadError && !current) {
     return (
       <section>
-        <ErrorState message={error} onRetry={() => { setError(""); setLoadedId(null); setAttempt((value) => value + 1); }} />
+        <ErrorState
+          title={loadError.title}
+          message={loadError.message}
+          onRetry={() => { setLoadError(null); setLoadedId(null); setAttempt((value) => value + 1); }}
+        />
         <Link to="/products" className="btn-outline mt-4">Back to products</Link>
       </section>
     );
   }
-  if (!current) return <LoadingState label="Loading product..." />;
+  if (!current) return <LoadingState label="Loading product details..." />;
   const inStock = current.available_quantity > 0;
 
   return (
@@ -142,7 +149,7 @@ export default function ProductDetailsPage() {
           <p className="mt-5 font-semibold text-red-700">Out of Stock</p>
         )}
         {quantityError ? <p className="mt-2 text-sm text-red-700">{quantityError}</p> : null}
-        {error ? <div className="mt-3"><ErrorNote message={error} /></div> : null}
+        {actionError ? <div className="mt-3"><ErrorNote message={actionError} /></div> : null}
       </div>
     </article>
   );

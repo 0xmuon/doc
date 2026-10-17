@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchCurrentUser } from "../api/authApi";
 import { fetchMyOrders } from "../api/orderApi";
-import { ErrorState, LoadingState } from "../components/common/StatusMessage";
+import { EmptyState, ErrorState, LoadingState } from "../components/common/StatusMessage";
 import OrderListItem from "../components/orders/OrderListItem";
 import { useAuth } from "../context/auth-context";
+import { describeLoadError } from "../utils/loadError";
 
 const PAYMENT_LABEL = {
   CARD: "Credit Card",
@@ -22,7 +23,7 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [orders, setOrders] = useState(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -37,10 +38,14 @@ export default function ProfilePage() {
         if (ignore) return;
         setProfile(me);
         setOrders(history.filter((order) => order.payment_status === "PAID"));
-        setError("");
+        setError(null);
       })
       .catch((err) => {
-        if (!ignore) setError(err.message);
+        if (!ignore) {
+          setProfile(null);
+          setOrders(null);
+          setError(describeLoadError("profile data", err));
+        }
       });
     return () => {
       ignore = true;
@@ -51,7 +56,11 @@ export default function ProfilePage() {
     return (
       <section>
         <h1 className="page-title">Profile</h1>
-        <ErrorState message={error} onRetry={() => { setError(""); setProfile(null); setOrders(null); setAttempt((value) => value + 1); }} />
+        <ErrorState
+          title={error.title}
+          message={error.message}
+          onRetry={() => { setError(null); setProfile(null); setOrders(null); setAttempt((value) => value + 1); }}
+        />
       </section>
     );
   }
@@ -74,16 +83,18 @@ export default function ProfilePage() {
         </dl>
       </article>
       <h2 className="mt-8 text-xl font-semibold tracking-tight text-slate-900">Placed orders</h2>
-      {orders.length === 0 ? <p className="mt-4 text-sm">No placed orders yet.</p> : null}
-      <ul className="mt-4 space-y-4">
-        {orders.map((order) => (
-          <OrderListItem
-            key={order.order_id}
-            order={order}
-            detail={PAYMENT_LABEL[order.payment_method] || order.payment_method}
-          />
-        ))}
-      </ul>
+      {orders.length === 0 ? <EmptyState message="No placed orders yet." /> : null}
+      {orders.length > 0 ? (
+        <ul className="mt-4 space-y-4">
+          {orders.map((order) => (
+            <OrderListItem
+              key={order.order_id}
+              order={order}
+              detail={PAYMENT_LABEL[order.payment_method] || order.payment_method}
+            />
+          ))}
+        </ul>
+      ) : null}
     </section>
   );
 }

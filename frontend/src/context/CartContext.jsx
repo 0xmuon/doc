@@ -10,6 +10,7 @@ export function CartProvider({ children }) {
   const { token, user, ready } = useAuth();
   const [cartState, setCartState] = useState(null);
   const [cartError, setCartError] = useState("");
+  const [addedNotice, setAddedNotice] = useState("");
   const userId = user?.user_id;
 
   const refreshCart = useCallback(async () => {
@@ -23,7 +24,7 @@ export function CartProvider({ children }) {
       setCartError("");
       return data;
     } catch (err) {
-      setCartError(err.message || "Could not load the cart.");
+      setCartError(err.message || "Error fetching cart data.");
       throw err;
     }
   }, [token, userId]);
@@ -38,7 +39,7 @@ export function CartProvider({ children }) {
         setCartError("");
       })
       .catch((err) => {
-        if (!ignore) setCartError(err.message || "Could not load the cart.");
+        if (!ignore) setCartError(err.message || "Error fetching cart data.");
       });
     return () => {
       ignore = true;
@@ -54,6 +55,21 @@ export function CartProvider({ children }) {
     setCartError("");
   }, [userId]);
 
+  const notifyAdded = useCallback((productName) => {
+    const name = String(productName || "").trim();
+    setAddedNotice(name ? `${name} was added to the cart.` : "Item was added to the cart.");
+  }, []);
+
+  const clearAddedNotice = useCallback(() => {
+    setAddedNotice("");
+  }, []);
+
+  useEffect(() => {
+    if (!addedNotice) return undefined;
+    const timer = window.setTimeout(() => setAddedNotice(""), 5000);
+    return () => window.clearTimeout(timer);
+  }, [addedNotice]);
+
   const value = useMemo(() => {
     const signedIn = Boolean(token && userId);
     const mine = signedIn && cartState?.userId === userId ? cartState.cart : null;
@@ -64,8 +80,19 @@ export function CartProvider({ children }) {
     const overStock = items.some(
       (item) => item.quantity > item.available_quantity || item.quantity > MAX_QUANTITY_PER_ITEM,
     );
-    return { cart: visible, cartError: visibleError, items, itemCount, overStock, refreshCart, setCart };
-  }, [cartError, cartState, refreshCart, setCart, token, userId]);
+    return {
+      cart: visible,
+      cartError: visibleError,
+      items,
+      itemCount,
+      overStock,
+      addedNotice,
+      notifyAdded,
+      clearAddedNotice,
+      refreshCart,
+      setCart,
+    };
+  }, [addedNotice, cartError, cartState, clearAddedNotice, notifyAdded, refreshCart, setCart, token, userId]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

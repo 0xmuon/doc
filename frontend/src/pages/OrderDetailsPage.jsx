@@ -6,6 +6,7 @@ import { ErrorNote, ErrorState, LoadingState } from "../components/common/Status
 import { statusLabels } from "../utils/statusLabels";
 import { useAuth } from "../context/auth-context";
 import { useCart } from "../context/cart-context";
+import { describeActionError, describeLoadError } from "../utils/loadError";
 import { inr } from "../utils/money";
 
 export default function OrderDetailsPage() {
@@ -14,28 +15,31 @@ export default function OrderDetailsPage() {
   const { token, ready } = useAuth();
   const { refreshCart } = useCart();
   const navigate = useNavigate();
-  const [loaded, setLoaded] = useState({ id: "", order: null, error: "" });
+  const [loaded, setLoaded] = useState({ id: "", order: null, error: null });
   const [actionError, setActionError] = useState("");
   const [busy, setBusy] = useState("");
   const [attempt, setAttempt] = useState(0);
   const order = loaded.id === orderId ? loaded.order : null;
-  const loadError = loaded.id === orderId ? loaded.error : "";
+  const loadError = loaded.id === orderId ? loaded.error : null;
 
   useEffect(() => {
     if (!ready || !token) return undefined;
     let ignore = false;
     fetchOrder(orderId, token)
       .then((row) => {
-        if (!ignore) setLoaded({ id: orderId, order: row, error: "" });
+        if (!ignore) setLoaded({ id: orderId, order: row, error: null });
       })
       .catch((err) => {
         if (ignore) return;
-        const message = err.status === 403
-          ? "You can only view your own orders."
-          : err.status === 404
-            ? "Order not found."
-            : err.message;
-        setLoaded({ id: orderId, order: null, error: message });
+        const failed = describeLoadError("order details", err);
+        if (err.status === 403) {
+          failed.title = "Cannot load order details";
+          failed.message = "You can only view your own orders.";
+        } else if (err.status === 404) {
+          failed.title = "Order not found";
+          failed.message = "This order does not exist or was removed.";
+        }
+        setLoaded({ id: orderId, order: null, error: failed });
       });
     return () => {
       ignore = true;
@@ -47,9 +51,9 @@ export default function OrderDetailsPage() {
     setActionError("");
     try {
       const updated = await retryPayment(order.order_id, token);
-      setLoaded({ id: orderId, order: updated, error: "" });
+      setLoaded({ id: orderId, order: updated, error: null });
     } catch (err) {
-      setActionError(err.message);
+      setActionError(describeActionError("Could not retry payment", err));
     } finally {
       setBusy("");
     }
@@ -63,7 +67,7 @@ export default function OrderDetailsPage() {
       await refreshCart();
       navigate("/cart");
     } catch (err) {
-      setActionError(err.message);
+      setActionError(describeActionError("Could not return to cart", err));
       setBusy("");
     }
   }
@@ -72,11 +76,15 @@ export default function OrderDetailsPage() {
     return (
       <section>
         <Link to="/orders" className="text-sm font-medium text-blue-700 hover:underline">Back to order history</Link>
-        <ErrorState message={loadError} onRetry={() => { setLoaded({ id: "", order: null, error: "" }); setAttempt((value) => value + 1); }} />
+        <ErrorState
+          title={loadError.title}
+          message={loadError.message}
+          onRetry={() => { setLoaded({ id: "", order: null, error: null }); setAttempt((value) => value + 1); }}
+        />
       </section>
     );
   }
-  if (!order) return <LoadingState label="Loading order..." />;
+  if (!order) return <LoadingState label="Loading order details..." />;
 
   return (
     <section>

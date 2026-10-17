@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ErrorNote, ErrorState, LoadingState } from "../components/common/StatusMessage";
+import { EmptyState, ErrorNote, ErrorState, LoadingState } from "../components/common/StatusMessage";
 import SearchBar from "../components/products/SearchBar";
 import ProductCard from "../components/products/ProductCard";
 import { fetchCategories, fetchProducts, searchProducts } from "../api/productApi";
@@ -12,6 +12,7 @@ import { useAuth } from "../context/auth-context";
 import { useCart } from "../context/cart-context";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { setCartQuantity } from "../utils/cartQuantity";
+import { describeActionError, describeLoadError } from "../utils/loadError";
 
 /** Name matches the search route. A typed category is included too, because that route matches names only. */
 async function loadProducts(name, category) {
@@ -32,7 +33,7 @@ async function loadProducts(name, category) {
 
 export default function ProductsPage() {
   const { token, user } = useAuth();
-  const { items, refreshCart } = useCart();
+  const { items, refreshCart, notifyAdded } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
   const [name, setName] = useState("");
@@ -40,7 +41,7 @@ export default function ProductsPage() {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [loadedKey, setLoadedKey] = useState(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null);
   const [categoryError, setCategoryError] = useState("");
   const [reload, setReload] = useState(0);
   const [pendingId, setPendingId] = useState(0);
@@ -59,7 +60,7 @@ export default function ProductsPage() {
         setCategoryError("");
       })
       .catch((err) => {
-        if (!ignore) setCategoryError(err.message);
+        if (!ignore) setCategoryError(describeLoadError("categories", err).message);
       });
     return () => {
       ignore = true;
@@ -76,12 +77,13 @@ export default function ProductsPage() {
           (a, b) => Number(a.available_quantity <= 0) - Number(b.available_quantity <= 0),
         );
         setProducts(ordered);
-        setError("");
+        setError(null);
         setLoadedKey(key);
       })
       .catch((err) => {
         if (ignore) return;
-        setError(err.message);
+        setProducts([]);
+        setError(describeLoadError("product data", err));
         setLoadedKey(key);
       });
     return () => {
@@ -90,9 +92,10 @@ export default function ProductsPage() {
   }, [debouncedName, category, reload]);
 
   function retryLoad() {
-    setError("");
+    setError(null);
     setCategoryError("");
     setLoadedKey(null);
+    setProducts([]);
     setReload((current) => current + 1);
   }
 
@@ -117,8 +120,9 @@ export default function ProductsPage() {
         line,
       });
       await refreshCart();
+      if (nextQuantity > (line?.quantity ?? 0)) notifyAdded(product.product_name);
     } catch (err) {
-      setStockError({ id: product.product_id, message: err.message });
+      setStockError({ id: product.product_id, message: describeActionError("Could not update cart", err) });
     } finally {
       pendingRef.current = 0;
       setPendingId(0);
@@ -145,22 +149,28 @@ export default function ProductsPage() {
           ))}
         </select>
       </div>
-      {categoryError ? <div className="mt-4"><ErrorNote message={categoryError} /></div> : null}
-      {error ? <ErrorState message={error} onRetry={retryLoad} /> : null}
+      {categoryError ? (
+        <div className="mt-4">
+          <ErrorNote message={`Error fetching categories: ${categoryError}`} />
+        </div>
+      ) : null}
       {!loaded && !error ? <LoadingState label="Loading products..." /> : null}
-      {loaded && !error && products.length === 0 ? <p className="panel mt-6 px-4 py-8 text-center text-sm text-slate-600">No products found.</p> : null}
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {products.map((product) => (
-          <ProductCard
-            key={product.product_id}
-            product={product}
-            cartQuantity={items.find((item) => item.product_id === product.product_id)?.quantity || 0}
-            onChange={changeQuantity}
-            busy={pendingId === product.product_id}
-            message={stockError.id === product.product_id ? stockError.message : ""}
-          />
-        ))}
-      </div>
+      {error ? <ErrorState title={error.title} message={error.message} onRetry={retryLoad} /> : null}
+      {loaded && !error && products.length === 0 ? <EmptyState message="No products found." /> : null}
+      {loaded && !error && products.length > 0 ? (
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {products.map((product) => (
+            <ProductCard
+              key={product.product_id}
+              product={product}
+              cartQuantity={items.find((item) => item.product_id === product.product_id)?.quantity || 0}
+              onChange={changeQuantity}
+              busy={pendingId === product.product_id}
+              message={stockError.id === product.product_id ? stockError.message : ""}
+            />
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

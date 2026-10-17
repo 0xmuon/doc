@@ -21,22 +21,26 @@ export default function ProductCard({ product, cartQuantity, onChange, busy, mes
         </div>
       </Link>
       <div className="flex flex-1 flex-col px-4 pb-4">
-        <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{product.description || "No description available."}</p>
-        <p className="mt-3 text-lg font-semibold text-slate-900">{inr(product.price)}</p>
-        <p className="mt-1 text-sm text-slate-600">In cart: {quantity}</p>
-        {inStock ? (
-          <button
-            type="button"
-            className="btn-cart mt-4 w-fit"
-            onClick={() => onChange(product, quantity + 1)}
-            disabled={busy || quantity >= product.available_quantity || quantity >= MAX_QUANTITY_PER_ITEM}
-          >
-            {busy ? "Updating..." : "Add to Cart"}
-          </button>
-        ) : (
-          <p className="mt-4 text-sm font-semibold text-red-700">Out of Stock</p>
-        )}
-        {message ? <p className="mt-2 text-sm text-red-700">{message}</p> : null}
+        <p className="mt-2 truncate text-sm leading-6 text-slate-600" title={product.description || "No description available."}>
+          {product.description || "No description available."}
+        </p>
+        <div className="mt-auto pt-3">
+          <p className="text-lg font-semibold text-slate-900">{inr(product.price)}</p>
+          <p className="mt-1 text-sm text-slate-600">In cart: {quantity}</p>
+          {inStock ? (
+            <button
+              type="button"
+              className="btn-cart mt-4 w-fit"
+              onClick={() => onChange(product, quantity + 1)}
+              disabled={busy || quantity >= product.available_quantity || quantity >= MAX_QUANTITY_PER_ITEM}
+            >
+              {busy ? "Updating..." : "Add to Cart"}
+            </button>
+          ) : (
+            <p className="mt-4 text-sm font-semibold text-red-700">Out of Stock</p>
+          )}
+          {message ? <p className="mt-2 text-sm text-red-700">{message}</p> : null}
+        </div>
       </div>
     </article>
   );

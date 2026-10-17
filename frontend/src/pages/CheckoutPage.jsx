@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ErrorNote, ErrorState, LoadingState } from "../components/common/StatusMessage";
+import { EmptyState, ErrorNote, ErrorState, LoadingState } from "../components/common/StatusMessage";
 import { placeOrder as checkoutOrder } from "../api/orderApi";
 import { useAuth } from "../context/auth-context";
 import { useCart } from "../context/cart-context";
+import { describeActionError, describeLoadError } from "../utils/loadError";
 import { inr } from "../utils/money";
 
 export default function CheckoutPage() {
@@ -25,16 +26,21 @@ export default function CheckoutPage() {
       const failed = data.order.payment_status === "FAILED";
       navigate(`/orders/${data.order.order_id}`, { state: failed ? undefined : { justPlaced: true } });
     } catch (err) {
-      setError(err.message);
+      setError(describeActionError("Could not place order", err));
       setBusy(false);
     }
   }
 
   if (!cart && (error || cartError)) {
+    const failed = describeLoadError("checkout data", { message: error || cartError });
     return (
       <section>
         <h1 className="page-title">Checkout</h1>
-        <ErrorState message={error || cartError} onRetry={() => refreshCart().catch((err) => setError(err.message))} />
+        <ErrorState
+          title={failed.title}
+          message={failed.message}
+          onRetry={() => refreshCart().catch((err) => setError(describeLoadError("checkout data", err).message))}
+        />
       </section>
     );
   }
@@ -45,7 +51,7 @@ export default function CheckoutPage() {
     <section className="mx-auto max-w-2xl">
       <h1 className="page-title">Checkout</h1>
       <p className="mt-2 text-sm text-slate-600">Choose how you want to pay, then place the order.</p>
-      {cart.items.length === 0 ? <p className="panel mt-4 px-4 py-8 text-center text-sm text-slate-600">Your cart is empty.</p> : null}
+      {cart.items.length === 0 ? <EmptyState message="Your cart is empty." /> : null}
       {cart.items.length > 0 ? (
         <ul className="panel mt-5 divide-y divide-rose-100 px-4">
           {cart.items.map((item) => (

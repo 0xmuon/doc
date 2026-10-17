@@ -36,7 +36,7 @@ export default function LoginPage() {
       clearSessionNotice();
       navigate(safeReturnPath(location.state?.from), { replace: true });
     } catch (error) {
-      setServerError(error.status === 401 ? "Invalid email or password" : error.message);
+      setServerError(error.status === 401 ? "Invalid email or password" : `Login failed: ${error.message}`);
     } finally {
       setBusy(false);
     }

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import { Link, useNavigate } from "react-router-dom";
 import { removeCartItem, updateCartItem } from "../api/cartApi";
-import { ErrorNote, ErrorState, LoadingState } from "../components/common/StatusMessage";
+import { EmptyState, ErrorNote, ErrorState, LoadingState } from "../components/common/StatusMessage";
+import { describeActionError, describeLoadError } from "../utils/loadError";
 import { useAuth } from "../context/auth-context";
 import { useCart } from "../context/cart-context";
 import { inr } from "../utils/money";
@@ -86,7 +87,7 @@ export default function CartPage() {
       }
       await refreshCart();
     } catch (err) {
-      setServerError(err.message);
+      setServerError(describeActionError("Could not update cart", err));
     } finally {
       pendingRef.current = 0;
       setPendingId(0);
@@ -98,10 +99,15 @@ export default function CartPage() {
   }
 
   if (!cart && cartError) {
+    const failed = describeLoadError("cart data", { message: serverError || cartError });
     return (
       <section>
         <h1 className="page-title">Your Cart</h1>
-        <ErrorState message={serverError || cartError} onRetry={() => refreshCart().catch((err) => setServerError(err.message))} />
+        <ErrorState
+          title={failed.title}
+          message={failed.message}
+          onRetry={() => refreshCart().catch((err) => setServerError(describeLoadError("cart data", err).message))}
+        />
       </section>
     );
   }
@@ -113,8 +119,12 @@ export default function CartPage() {
     <section>
       <h1 className="page-title">Your Cart</h1>
       <p className="mt-2 text-sm text-slate-600">Review quantities, then continue to checkout.</p>
-      {serverError || cartError ? <div className="mt-3"><ErrorNote message={serverError || cartError} /></div> : null}
-      {cart.items.length === 0 ? <p className="panel mt-6 px-4 py-8 text-center text-sm text-slate-600">Your cart is empty.</p> : null}
+      {serverError || cartError ? (
+        <div className="mt-3">
+          <ErrorNote message={serverError || `Error fetching cart data: ${cartError}`} />
+        </div>
+      ) : null}
+      {cart.items.length === 0 ? <EmptyState message="Your cart is empty." /> : null}
       <ul className="mt-4 space-y-3">
         {cart.items.map((item) => (
           <li key={item.cart_item_id} className="panel flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">

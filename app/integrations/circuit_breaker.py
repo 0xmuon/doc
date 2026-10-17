@@ -46,6 +46,7 @@ class CircuitBreaker:
                     "circuit_off",
                     name=self.name,
                     state="open",
+                    transition="open -> open",
                     detail="payment api is still down, charge skipped",
                 )
                 raise CircuitOpenError(f"{self.name} circuit breaker is off")
@@ -59,14 +60,16 @@ class CircuitBreaker:
             if self.state == "half-open":
                 self._set_state("open", "half-open charge failed, breaker is off")
             elif self.failures >= self.max_failures:
-                self._set_state("half-open", f"{self.failures} payment failures")
+                self._set_state("half-open", f"{self.failures} payment failures, breaker is half-open")
             else:
                 _log(
                     "circuit_failure",
                     name=self.name,
                     state=self.state,
+                    transition=f"{self.state} -> {self.state}",
                     failures=self.failures,
                     max_failures=self.max_failures,
+                    detail=f"payment failure {self.failures} of {self.max_failures}, still closed",
                 )
             raise
         if self.state != "closed":
@@ -82,6 +85,7 @@ class CircuitBreaker:
             name=self.name,
             previous=previous,
             state=state,
+            transition=f"{previous} -> {state}",
             failures=self.failures,
             detail=detail,
         )

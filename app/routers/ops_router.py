@@ -33,7 +33,13 @@ async def process_payment(
     order = await db.run_sync(lambda sync_db: order_service.get_order(sync_db, payload.order_id))
     _can_charge(current, order.user_id)
     result = await order_service.retry_payment(db, payload.order_id)
-    background.add_task(send_order_notification, result.order_id, current.email, result.payment_status)
+    background.add_task(
+        send_order_notification,
+        result.order_id,
+        current.email,
+        result.payment_status,
+        "payment_retry",
+    )
     return result
 
 
@@ -46,5 +52,11 @@ def send_notification(
 ):
     order = order_service.get_order(db, payload.order_id)
     require_order_access(current, order.user_id)
-    background.add_task(send_order_notification, order.order_id, current.email, order.payment_status)
+    background.add_task(
+        send_order_notification,
+        order.order_id,
+        current.email,
+        order.payment_status,
+        "manual",
+    )
     return {"message": "Notification queued", "order_id": order.order_id}

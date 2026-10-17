@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { fetchMyOrders } from "../api/orderApi";
-import { ErrorState, LoadingState } from "../components/common/StatusMessage";
+import { EmptyState, ErrorState, LoadingState } from "../components/common/StatusMessage";
 import OrderListItem from "../components/orders/OrderListItem";
 import { useAuth } from "../context/auth-context";
+import { describeLoadError } from "../utils/loadError";
 
 export default function OrdersPage() {
   const { token, ready } = useAuth();
   const [orders, setOrders] = useState(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -17,10 +18,13 @@ export default function OrdersPage() {
       .then((rows) => {
         if (ignore) return;
         setOrders(rows);
-        setError("");
+        setError(null);
       })
       .catch((err) => {
-        if (!ignore) setError(err.message);
+        if (!ignore) {
+          setOrders(null);
+          setError(describeLoadError("order history", err));
+        }
       });
     return () => {
       ignore = true;
@@ -31,9 +35,15 @@ export default function OrdersPage() {
     <section>
       <h1 className="page-title">Order History</h1>
       <p className="mt-2 text-sm text-slate-600">Every order you have placed, including payment that is still pending or failed.</p>
-      {error ? <ErrorState message={error} onRetry={() => { setError(""); setOrders(null); setAttempt((value) => value + 1); }} /> : null}
       {!orders && !error ? <LoadingState label="Loading orders..." /> : null}
-      {orders && orders.length === 0 ? <p className="panel mt-6 px-4 py-8 text-center text-sm text-slate-600">No orders found.</p> : null}
+      {error ? (
+        <ErrorState
+          title={error.title}
+          message={error.message}
+          onRetry={() => { setError(null); setOrders(null); setAttempt((value) => value + 1); }}
+        />
+      ) : null}
+      {orders && orders.length === 0 ? <EmptyState message="No orders found." /> : null}
       {orders && orders.length > 0 ? (
         <ul className="mt-4 space-y-4">
           {orders.map((order) => (
