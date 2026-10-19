@@ -131,14 +131,18 @@ export default function ProductsPage() {
 
   return (
     <section>
-      <h1 className="page-title">Products</h1>
-      <p className="mt-2 text-sm text-slate-600">Search by name or category. Items that are out of stock stay at the end of the list.</p>
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-        <SearchBar value={name} onChange={setName} />
+      <div>
+        <h1 className="page-title">Products</h1>
+        <p className="page-lead">Search by name or category. Items that are out of stock stay at the end of the list.</p>
+      </div>
+      <div className="panel mt-5 flex flex-col gap-2 p-3 sm:flex-row sm:items-stretch">
+        <div className="min-w-0 flex-1">
+          <SearchBar value={name} onChange={setName} />
+        </div>
         <select
           value={category}
           onChange={(event) => setCategory(event.target.value)}
-          className="field mt-0 sm:max-w-xs"
+          className="field mt-0 sm:w-52 sm:shrink-0"
           aria-label="Search by category"
         >
           <option value="">All categories</option>
@@ -158,7 +162,7 @@ export default function ProductsPage() {
       {error ? <ErrorState title={error.title} message={error.message} onRetry={retryLoad} /> : null}
       {loaded && !error && products.length === 0 ? <EmptyState message="No products found." /> : null}
       {loaded && !error && products.length > 0 ? (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((product) => (
             <ProductCard
               key={product.product_id}

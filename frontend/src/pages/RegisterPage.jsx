@@ -96,8 +96,8 @@ export default function RegisterPage() {
       <form onSubmit={onSubmit} className="panel mx-auto max-w-md space-y-4 p-6 sm:p-8" noValidate>
         <div className="text-center">
           <p className="text-sm font-semibold tracking-wide text-red-600">ABC Shop</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">Create your account</h1>
-          <p className="mt-2 text-sm text-slate-600">Register once, then sign in to shop, save a cart, and place orders.</p>
+          <h1 className="font-display mt-1 text-3xl font-semibold tracking-tight text-stone-900">Create your account</h1>
+          <p className="mt-2 text-sm text-stone-600">Register once, then sign in to shop, save a cart, and place orders.</p>
         </div>
         <label className="field-label">
           Full Name

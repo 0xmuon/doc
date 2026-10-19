@@ -1,6 +1,9 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/auth-context";
 
+const HERO_IMAGE =
+  "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=2000&q=80";
+
 const areas = [
   {
     title: "Products",
@@ -49,13 +52,39 @@ const signedInActions = [
   },
 ];
 
+function Hero({ title, text, primary, secondary }) {
+  return (
+    <section className="shop-hero">
+      <div className="shop-hero__media" aria-hidden="true">
+        <img src={HERO_IMAGE} alt="" />
+      </div>
+      <div className="shop-hero__shade" aria-hidden="true" />
+      <div className="shop-hero__content">
+        <p className="shop-hero__brand">
+          ABC <span>Shop</span>
+        </p>
+        <h1 className="mt-5 font-display text-2xl font-semibold tracking-tight text-white sm:text-3xl">{title}</h1>
+        <p className="mt-3 max-w-md text-[0.95rem] leading-6 text-neutral-200">{text}</p>
+        <div className="mt-7 flex flex-wrap gap-2.5">
+          <Link to={primary.to} className="btn-cart px-5 py-2.5 text-sm">
+            {primary.label}
+          </Link>
+          <Link to={secondary.to} className="btn-ghost-light px-5 py-2.5 text-sm">
+            {secondary.label}
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function HomePage() {
   const { user, ready } = useAuth();
 
-  if (!ready) {
+  if (!ready && !user) {
     return (
-      <section>
-        <div className="panel px-6 py-10 text-center text-sm text-slate-600">Loading your home page...</div>
+      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+        <div className="panel px-6 py-10 text-center text-sm text-neutral-600">Loading your home page...</div>
       </section>
     );
   }
@@ -64,33 +93,26 @@ export default function HomePage() {
     const firstName = user.name.trim().split(/\s+/)[0] || user.name;
     return (
       <section>
-        <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-red-700 via-red-600 to-rose-500 px-6 py-10 text-white shadow-sm sm:px-10 sm:py-14">
-          <p className="text-sm font-semibold tracking-wide text-rose-100">ABC Shop</p>
-          <h1 className="mt-2 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">Hi {firstName}</h1>
-          <p className="mt-3 max-w-xl text-base leading-7 text-rose-50">
-            You are signed in. Here is what you can do next.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link to="/products" className="btn-cart">Browse products</Link>
-            <Link to="/cart" className="btn bg-white text-slate-900 hover:bg-rose-50">View cart</Link>
+        <Hero
+          title={`Hi ${firstName}`}
+          text="You are signed in. Here is what you can do next."
+          primary={{ to: "/products", label: "Browse products" }}
+          secondary={{ to: "/cart", label: "View cart" }}
+        />
+        <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+          <h2 className="page-title">You can do the following things</h2>
+          <p className="page-lead">Pick a step below to keep shopping or manage your account.</p>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            {signedInActions.map((action) => (
+              <article key={action.title} className="panel-interactive flex flex-col p-5">
+                <h3 className="font-display text-lg font-semibold text-neutral-900">{action.title}</h3>
+                <p className="mt-1.5 flex-1 text-sm leading-6 text-neutral-600">{action.text}</p>
+                <Link to={action.to} className="btn-primary mt-5 w-fit">
+                  {action.label}
+                </Link>
+              </article>
+            ))}
           </div>
-        </div>
-        <article className="panel mt-8 p-5">
-          <h2 className="text-lg font-semibold text-slate-900">You can do the following things</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            Pick a step below to keep shopping or manage your account.
-          </p>
-        </article>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          {signedInActions.map((action) => (
-            <article key={action.title} className="panel flex flex-col p-5">
-              <h3 className="text-lg font-semibold text-slate-900">{action.title}</h3>
-              <p className="mt-2 flex-1 text-sm leading-6 text-slate-600">{action.text}</p>
-              <Link to={action.to} className="btn-primary mt-5">
-                {action.label}
-              </Link>
-            </article>
-          ))}
         </div>
       </section>
     );
@@ -98,38 +120,39 @@ export default function HomePage() {
 
   return (
     <section>
-      <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-red-700 via-red-600 to-rose-500 px-6 py-10 text-white shadow-sm sm:px-10 sm:py-14">
-        <p className="text-sm font-semibold tracking-wide text-rose-100">ABC Shop</p>
-        <h1 className="mt-2 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">Everyday products, ready when you are.</h1>
-        <p className="mt-3 max-w-xl text-base leading-7 text-rose-50">
-          ABC Shop is the online shop. Look through products, add what you need to the cart, and check out.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link to="/products" className="btn-cart">Browse products</Link>
-          <Link to="/login" className="btn bg-white text-slate-900 hover:bg-rose-50">Login</Link>
+      <Hero
+        title="Everyday products, ready when you are."
+        text="Look through products, add what you need to the cart, and check out with card or cash on delivery."
+        primary={{ to: "/products", label: "Browse products" }}
+        secondary={{ to: "/login", label: "Login" }}
+      />
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+        <div className="grid gap-3 sm:grid-cols-3">
+          {areas.map((area) => (
+            <article key={area.title} className="panel-interactive flex flex-col p-5">
+              <h2 className="font-display text-lg font-semibold text-neutral-900">{area.title}</h2>
+              <p className="mt-1.5 flex-1 text-sm leading-6 text-neutral-600">{area.text}</p>
+              <Link to={area.to} className="btn-primary mt-5 w-fit">
+                {area.label}
+              </Link>
+            </article>
+          ))}
         </div>
-      </div>
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        {areas.map((area) => (
-          <article key={area.title} className="panel flex flex-col p-5">
-            <h2 className="text-lg font-semibold text-slate-900">{area.title}</h2>
-            <p className="mt-2 flex-1 text-sm leading-6 text-slate-600">{area.text}</p>
-            <Link to={area.to} className="btn-primary mt-5">
-              {area.label}
+        <article className="panel mt-3 p-5">
+          <h2 className="font-display text-lg font-semibold text-neutral-900">Account</h2>
+          <p className="mt-1.5 text-sm leading-6 text-neutral-600">
+            New shoppers register with a name, email, and password. Returning shoppers log in with email and password.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2.5">
+            <Link to="/login" className="btn-primary">
+              Login
             </Link>
-          </article>
-        ))}
+            <Link to="/register" className="btn-outline">
+              Register
+            </Link>
+          </div>
+        </article>
       </div>
-      <article className="panel mt-4 p-5">
-        <h2 className="text-lg font-semibold text-slate-900">Account</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          New shoppers register with a name, email, and password. Returning shoppers log in with email and password.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <Link to="/login" className="btn-primary">Login</Link>
-          <Link to="/register" className="btn-outline">Register</Link>
-        </div>
-      </article>
     </section>
   );
 }

@@ -106,9 +106,9 @@ export default function ProductDetailsPage() {
       <div>
         <Link to="/products" className="text-sm font-medium text-blue-700 hover:underline">Back to products</Link>
         {current.product_url ? (
-          <img src={current.product_url} alt={current.product_name} className="mt-4 h-72 w-full rounded-xl bg-slate-50 object-contain p-4" />
+          <img src={current.product_url} alt={current.product_name} className="mt-4 h-72 w-full border border-neutral-300 bg-neutral-50 object-contain p-4" />
         ) : (
-          <div className="mt-4 flex h-72 items-center justify-center rounded-xl bg-slate-50 text-sm text-slate-400">No image</div>
+          <div className="mt-4 flex h-72 items-center justify-center border border-neutral-300 bg-neutral-50 text-sm text-neutral-400">No image</div>
         )}
       </div>
       <div>

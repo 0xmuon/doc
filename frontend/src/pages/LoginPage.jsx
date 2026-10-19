@@ -46,8 +46,8 @@ export default function LoginPage() {
     <form onSubmit={onSubmit} className="panel mx-auto max-w-md space-y-4 p-6 sm:p-8" noValidate>
       <div className="text-center">
         <p className="text-sm font-semibold tracking-wide text-red-600">ABC Shop</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">Welcome back</h1>
-        <p className="mt-2 text-sm text-slate-600">Sign in with the email and password for your account.</p>
+        <h1 className="font-display mt-1 text-3xl font-semibold tracking-tight text-stone-900">Welcome back</h1>
+        <p className="mt-2 text-sm text-stone-600">Sign in with the email and password for your account.</p>
       </div>
       {notice && !serverError ? (
         <p className="rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">{notice}</p>

@@ -2,13 +2,17 @@
 import { NavLink, useLocation } from "react-router-dom";
 
 const linkClass = ({ isActive }) =>
-  `rounded-full px-3 py-1.5 text-sm transition ${isActive ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`;
+  `border-b-2 px-1 py-1 text-sm transition ${
+    isActive
+      ? "border-red-600 font-semibold text-neutral-900"
+      : "border-transparent text-neutral-600 hover:border-neutral-300 hover:text-neutral-900"
+  }`;
 
 export default function Menu() {
   const { pathname } = useLocation();
   const onHome = pathname === "/" || pathname === "/home";
   return (
-    <nav className="order-3 flex w-full flex-wrap items-center gap-1 md:order-2 md:w-auto" aria-label="Shop">
+    <nav className="order-3 flex w-full items-center gap-4 md:order-none md:w-auto" aria-label="Shop">
       <NavLink to="/home" className={() => linkClass({ isActive: onHome })}>
         Home
       </NavLink>
