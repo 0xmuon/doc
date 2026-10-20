@@ -35,22 +35,13 @@ Deploy in short (full steps in the lambda README):
 4. Test `{}` → expect `{"ok": true, "product_count": 10, ...}`.
 5. Trigger: EventBridge schedule `rate(5 minutes)`.
 
-## 2. (Optional) Lambda triggered by an S3 update
+## 2. Lambda triggered by an S3 update — NOT used
 
-Uploading a new ZIP stops being a manual CodeBuild click:
-
-1. IAM role for Lambda with `codebuild:StartBuild` on `frontend-build-http`.
-2. Lambda `ecommerce-s3-deploy-trigger` (Python 3.12) that calls
-   `codebuild.start_build(projectName="frontend-build-http")` when a key
-   ending in `frontend-http.zip` arrives (handler skeleton: parse
-   `event["Records"][0]["s3"]["object"]["key"]`).
-3. `sourcecode-*` bucket → Properties → Event notifications → object-created,
-   suffix `.zip`, destination = this Lambda.
-4. Test: re-upload `frontend-http.zip` → CodeBuild history shows a build
-   that started by itself.
-
-Backend variant (only if asked): S3 event → Lambda → SSM Run Command on EC2
-to download/unzip/restart. Lambda alone cannot deploy onto EC2.
+Decided against it. There is exactly **one** Lambda in this project
+(`ecommerce-product-refresh`, above). Uploading a new
+`frontend-http.zip` does **not** start anything automatically — go to
+CodeBuild → `frontend-build-http` → **Start build** manually after each
+upload. No S3 event notifications are configured on the source bucket.
 
 ## 3. Deferred (skip for now)
 

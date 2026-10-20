@@ -72,20 +72,28 @@ Description=ABC Shop backend
 After=network.target
 
 [Service]
-WorkingDirectory=/home/ubuntu/ecommerce
+WorkingDirectory=/home/ubuntu/application
 Environment=USE_SECRETS_MANAGER=1
 Environment=DB_SECRET_NAME=ecommerce-db-secrets
 Environment=AWS_REGION=us-east-1
 Environment=CORS_ALLOWED_ORIGINS=http://frontend-http-xy-1234.s3-website-us-east-1.amazonaws.com
 Environment=PAYMENT_API_URL=http://127.0.0.1:9000/payments/charge
 Environment=NOTIFY_API_URL=http://127.0.0.1:9000/notify
-ExecStart=/usr/bin/python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+ExecStart=/home/ubuntu/application/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 User=ubuntu
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
 ```
+
+Adjust `WorkingDirectory`/the venv path if your app folder or virtualenv
+differs (`which python` inside the activated venv shows the right one).
+If you run Uvicorn manually in a console instead of systemd, export the
+same `USE_SECRETS_MANAGER`/`DB_SECRET_NAME`/`AWS_REGION` lines in that
+shell before starting it — and make sure `DATABASE_URL` and `JWT_SECRET`
+are **not** exported there, because a set env var takes priority over
+Secrets Manager.
 
 ```bash
 sudo systemctl daemon-reload
