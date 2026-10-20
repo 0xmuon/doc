@@ -2,18 +2,32 @@
 
 import os
 
-from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-load_dotenv()
 
-# postgresql+psycopg://user:password@db:5432/shopping
-# sqlite+aiosqlite:///./ecommerce.db
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+psycopg://shop:shop@localhost:5433/shopping",
-)
+def _database_url() -> str:
+    """Where the database credentials come from, in order:
+
+    1. ``DATABASE_URL`` env var — local dev, Docker Compose, tests.
+    2. AWS Secrets Manager — on EC2 (``USE_SECRETS_MANAGER=1``), so the
+       deployed box needs no .env file at all. See SECRETS_MANAGER.md.
+    3. Local Postgres default for a bare ``uvicorn`` run.
+    """
+    url = os.getenv("DATABASE_URL", "").strip()
+    if url:
+        return url
+    from app.secrets import secrets_enabled
+
+    if secrets_enabled():
+        from app.secrets import database_url_from_secret
+
+        return database_url_from_secret()
+    # postgresql+psycopg://user:password@db:5432/shopping
+    return "postgresql+psycopg://shop:shop@localhost:5433/shopping"
+
+
+DATABASE_URL = _database_url()
 
 
 def _sync_url(url: str) -> str:

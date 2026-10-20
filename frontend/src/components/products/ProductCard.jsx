@@ -2,11 +2,13 @@
 import PropTypes from "prop-types";
 import { Link } from "react-router-dom";
 import { inr } from "../../utils/money";
+import { lowStockText, remainingStock } from "../../utils/stock";
 import { MAX_QUANTITY_PER_ITEM } from "../../utils/validate";
 
 export default function ProductCard({ product, cartQuantity, onChange, busy, message }) {
   const inStock = product.available_quantity > 0;
   const quantity = cartQuantity || 0;
+  const urgency = inStock ? lowStockText(remainingStock(product.available_quantity, quantity)) : null;
   return (
     <article className="product-card flex flex-col">
       <Link to={`/products/${product.product_id}`} className="block">
@@ -41,6 +43,7 @@ export default function ProductCard({ product, cartQuantity, onChange, busy, mes
             <p className="price-tag text-xl text-neutral-900">{inr(product.price)}</p>
             <p className="text-xs text-neutral-500">In cart: {quantity}</p>
           </div>
+          {urgency ? <p className="mt-2 text-sm font-semibold text-red-700">{urgency}</p> : null}
           {inStock ? (
             <button
               type="button"

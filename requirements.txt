@@ -13,6 +13,7 @@ pwdlib[argon2]
 casbin
 httpx
 debugpy
+boto3
 pytest
 pytest-cov
 ruff

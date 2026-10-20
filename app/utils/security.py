@@ -4,14 +4,29 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from dotenv import load_dotenv
 
 from app.utils import UnauthorizedException
 
-load_dotenv()
 
-# hs256 wants a long secret,so the default is already 32+ characters.
-JWT_SECRET = os.getenv("JWT_SECRET", "change-this-shopping-secret-key-32b")
+def _jwt_secret() -> str:
+    """Env var locally; Secrets Manager (``jwt_secret`` key) on EC2."""
+    value = os.getenv("JWT_SECRET", "").strip()
+    if value:
+        return value
+    from app.secrets import secrets_enabled
+
+    if secrets_enabled():
+        from app.secrets import jwt_secret_from_secret
+
+        secret = jwt_secret_from_secret()
+        if not secret:
+            raise RuntimeError("Secrets Manager secret has no 'jwt_secret' key")
+        return secret
+    # hs256 wants a long secret,so the default is already 32+ characters.
+    return "change-this-shopping-secret-key-32b"
+
+
+JWT_SECRET = _jwt_secret()
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "60"))
 JWT_REFRESH_EXPIRE_DAYS = int(os.getenv("JWT_REFRESH_EXPIRE_DAYS", "7"))

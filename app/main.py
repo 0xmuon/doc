@@ -5,6 +5,7 @@ schema checks input first.tables are made when app starts.
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -43,12 +44,47 @@ app = FastAPI(
     docs_url=None,
 )
 
+def _cors_allowed_origins() -> list[str]:
+    """Exact browser origins allowed to call this API. HTTP only, for now.
+
+    Set CORS_ALLOWED_ORIGINS on the server (comma-separated, exact
+    scheme + host, no path, no trailing slash), e.g. the S3 static-website
+    endpoint of the http frontend bucket:
+      CORS_ALLOWED_ORIGINS=http://frontend-http-xy-1234.s3-website-us-east-1.amazonaws.com
+    Unset keeps local Vite dev working.
+
+    Security rules enforced here, whatever the env contains:
+    - no wildcard: "*" is dropped (never combine "*" with credentials);
+    - http:// only for now: https:// entries are dropped until HTTPS is
+      actually deployed, so a stray https origin cannot silently pass;
+    - exact origins only: anything with a path (e.g. http://host/app) is
+      dropped — browsers send Origin as scheme + host (+ port) only.
+    """
+    from urllib.parse import urlparse
+
+    raw = os.getenv("CORS_ALLOWED_ORIGINS", "").strip()
+    if not raw:
+        return ["http://127.0.0.1:5173", "http://localhost:5173"]
+    origins = []
+    for entry in raw.split(","):
+        origin = entry.strip().rstrip("/")
+        if not origin or origin == "*":
+            continue
+        parsed = urlparse(origin)
+        if parsed.scheme != "http" or not parsed.netloc or parsed.path not in ("", "/"):
+            logger.warning("CORS origin rejected (http origin only, no path): %s", entry.strip())
+            continue
+        if origin not in origins:
+            origins.append(origin)
+    return origins
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_allowed_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 # added last so it runs first and sees the final status code.
 app.add_middleware(RequestLogMiddleware)

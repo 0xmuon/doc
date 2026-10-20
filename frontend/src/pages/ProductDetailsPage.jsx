@@ -11,6 +11,7 @@ import { useCart } from "../context/cart-context";
 import { setCartQuantity } from "../utils/cartQuantity";
 import { describeActionError, describeLoadError } from "../utils/loadError";
 import { inr } from "../utils/money";
+import { lowStockText, remainingStock } from "../utils/stock";
 import { MAX_QUANTITY_PER_ITEM, validateQuantity } from "../utils/validate";
 
 export default function ProductDetailsPage() {
@@ -100,6 +101,7 @@ export default function ProductDetailsPage() {
   }
   if (!current) return <LoadingState label="Loading product details..." />;
   const inStock = current.available_quantity > 0;
+  const urgency = inStock ? lowStockText(remainingStock(current.available_quantity, cartLine?.quantity || 0)) : null;
 
   return (
     <article className="panel mx-auto grid max-w-4xl gap-6 p-5 sm:p-8 lg:grid-cols-2">
@@ -118,6 +120,7 @@ export default function ProductDetailsPage() {
         <p className="mt-4 text-2xl font-semibold text-slate-900">{inr(current.price)}</p>
         <p className="mt-2 text-sm text-slate-500">SKU {current.sku}</p>
         <p className={`mt-1 text-sm font-medium ${inStock ? "text-slate-700" : "text-red-700"}`}>{inStock ? `${current.available_quantity} in stock` : "Out of Stock"}</p>
+        {urgency ? <p className="mt-1 text-sm font-semibold text-red-700">{urgency}</p> : null}
         <p className="mt-1 text-sm text-slate-700">In cart: {cartLine?.quantity || 0}</p>
         {inStock ? (
           <div className="mt-5 flex flex-wrap items-end gap-3">

@@ -17,11 +17,7 @@ body {
   margin: 0;
   font-family: var(--font-sans);
   color: var(--color-ink);
-  background-color: #eceff1;
-  background-image:
-    linear-gradient(rgba(23, 23, 23, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(23, 23, 23, 0.035) 1px, transparent 1px);
-  background-size: 28px 28px;
+  background: var(--color-wash);
 }
 
 .font-display {
@@ -61,21 +57,86 @@ body {
   border-color: #a3a3a3;
 }
 
-.field {
-  margin-top: 0.35rem;
+/* In @layer components so Tailwind width utilities (w-20, sm:w-52, ...) can
+   override width: 100% — unlayered CSS would win over layered utilities and
+   squeezed the search box to 0px next to the category select. */
+@layer components {
+  .field {
+    margin-top: 0.35rem;
+    width: 100%;
+    min-height: 3rem;
+    border-radius: 2px;
+    border: 1.5px solid #737373;
+    background: #fff;
+    padding: 0.65rem 0.75rem;
+    font-size: 1rem;
+    color: var(--color-ink);
+    outline: none;
+  }
+
+  .field::placeholder {
+    color: #525252;
+    opacity: 1;
+  }
+
+  .field:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+  }
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   width: 100%;
+  min-height: 3.25rem;
+  border: 2px solid #404040;
   border-radius: 2px;
-  border: 1px solid var(--color-line);
   background: #fff;
-  padding: 0.6rem 0.7rem;
-  font-size: 0.875rem;
-  color: var(--color-ink);
+  padding: 0 0.75rem;
+}
+
+.search-bar:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+}
+
+.search-bar__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0.75rem 0;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #171717;
   outline: none;
 }
 
-.field:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+.search-bar__input::placeholder {
+  color: #525252;
+  opacity: 1;
+  font-weight: 400;
+}
+
+.search-bar__input::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+
+.search-bar__clear {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  padding: 0.25rem 0.125rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.search-bar__clear:hover {
+  text-decoration: underline;
 }
 
 .field-label {
